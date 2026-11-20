@@ -26,13 +26,40 @@ def _tokens_msg(m: dict) -> int:
     return estimar_tokens((m.get("content") or "") + extra)
 
 
+LIMITE_FERRAMENTA_NO_HISTORICO = 600  # caracteres
+
+
+def compactar_ferramenta(conteudo: str) -> str:
+    """Resultado de ferramenta enxuto pro histórico. Uma busca com páginas lidas
+    tem ~2 mil tokens; guardar inteiro faria três buscas comerem o orçamento.
+    A resposta da Athena já carrega o que importava; aqui fica só a referência."""
+    if len(conteudo) <= LIMITE_FERRAMENTA_NO_HISTORICO:
+        return conteudo
+    try:
+        dados = json.loads(conteudo)
+    except json.JSONDecodeError:
+        dados = None
+    if isinstance(dados, dict) and isinstance(dados.get("resultados"), list):
+        refs = [{k: r[k] for k in ("titulo", "url", "data") if r.get(k)} for r in dados["resultados"]]
+        return json.dumps({"consulta": dados.get("consulta"), "resultados": refs,
+                           "obs": "conteúdo das páginas omitido no histórico"}, ensure_ascii=False)
+    if isinstance(dados, dict) and "texto" in dados:
+        return json.dumps({"url": dados.get("url"), "obs": "texto da página omitido no histórico"},
+                          ensure_ascii=False)
+    return conteudo[:LIMITE_FERRAMENTA_NO_HISTORICO] + "…(cortado no histórico)"
+
+
 class MemoriaCurta:
     def __init__(self, orcamento_tokens: int):
         self.orcamento = orcamento_tokens
         self.turnos: list[list[dict]] = []
 
     def adicionar_turno(self, mensagens: list[dict]) -> None:
-        self.turnos.append(mensagens)
+        compacto = [
+            {**m, "content": compactar_ferramenta(m.get("content") or "")} if m["role"] == "tool" else m
+            for m in mensagens
+        ]
+        self.turnos.append(compacto)
         self._aparar()
 
     def _total(self) -> int:

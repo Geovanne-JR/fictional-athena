@@ -10,7 +10,7 @@
 ![Ollama](https://img.shields.io/badge/Ollama-local-000000?logo=ollama&logoColor=white)
 ![Gemma 4](https://img.shields.io/badge/cérebro-Gemma%204%2012B-4285F4?logo=google&logoColor=white)
 ![GPU](https://img.shields.io/badge/roda%20em-RTX%203060%2012GB-76B900?logo=nvidia&logoColor=white)
-![Status](https://img.shields.io/badge/status-Etapa%201%20de%205-blueviolet)
+![Status](https://img.shields.io/badge/status-Etapa%202%20de%205-blueviolet)
 
 </div>
 
@@ -64,7 +64,7 @@ Modelos pequenos tendem a repetir bordões e a ficar obcecados por qualquer tema
 O segredo está em montar o prompt pensando no cache: a personalidade fica num system prompt **100% estático**, e tudo que muda (hora, emoção, avisos) entra num bloco de contexto na mensagem atual. Assim o modelo reaproveita o cache KV e só processa o que é novo.
 
 ### 🛠️ Ferramentas
-Ela consulta o mundo real em vez de inventar. Hoje lê o estado do PC (CPU, RAM, temperatura e VRAM da GPU). A camada de ferramentas está pronta pra crescer: busca na web, controle do sistema e muito mais.
+Ela consulta o mundo real em vez de inventar: lê o estado do PC (CPU, RAM, temperatura e VRAM da GPU) e **pesquisa na internet**. Modelos pequenos decidem mal quando pesquisar e tendem a completar lacunas com palpites, então a decisão de buscar fica no código, e a regra é dura: se a busca não trouxe, ela diz que não achou. A história de como chegamos nisso, com os testes que falharam, está em [`docs/decisoes/002`](docs/decisoes/002-busca-web-automatica.md).
 
 ### 🔒 Local de verdade
 O modelo, as conversas, o estado emocional e a memória ficam no disco da máquina. Nenhuma API paga e nenhum dado sai do PC.
@@ -90,7 +90,7 @@ As decisões de projeto, explicadas uma a uma, estão em [`docs/ARQUITETURA.md`]
 ## 🗺️ Roadmap
 
 - [x] **Etapa 1: cérebro e personalidade.** Gemma 4 via Ollama, motor emocional, anti-repetição, memória de curto prazo e ferramentas.
-- [ ] **Etapa 2: internet.** Busca na web em tempo real, com fonte citada.
+- [x] **Etapa 2: internet.** Busca na web em tempo real, decidida pelo código (o modelo sozinho decidia mal), páginas lidas e protegidas contra prompt injection e acesso à rede interna.
 - [ ] **Etapa 2.5: no bolso.** Servidor + app Android, acessível de qualquer lugar por rede privada.
 - [ ] **Etapa 3: memória de longo prazo.** ChromaDB com fatos, episódios e documentos.
 - [ ] **Etapa 4: voz.** Palavra de ativação, Whisper pra ouvir e Piper pra falar, tudo offline.

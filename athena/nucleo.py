@@ -15,9 +15,9 @@ from .cerebro import Cerebro, Evento
 from .config import Config
 from .estado import MotorEmocional, eh_despedida
 from .memoria import Diario, MemoriaCurta
-from .prompt import analisar_repeticao, bloco_contexto, montar_system
+from .prompt import analisar_repeticao, bloco_contexto, montar_system, pede_atualidade, tipo_de_busca
 
-MAX_RODADAS_FERRAMENTA = 4
+MAX_RODADAS_FERRAMENTA = 5  # ex.: buscar → ler página → buscar de novo → ler → responder
 
 
 class Athena:
@@ -42,6 +42,14 @@ class Athena:
             self.memoria.ultimas_perguntas(4) + [texto],
             self.cfg.temas_vigiados,
         )
+        busca_automatica = bool(self.ferramentas) and pede_atualidade(texto)
+        if busca_automatica:
+            avisos.append(
+                "já foi feita uma busca na web com a pergunta dele (resultados abaixo). Responda só com o que "
+                "os resultados dizem e compare as datas com a de hoje: 'último' é o mais recente até hoje. "
+                "Resultado sem data pode ser página antiga: se usar um, diga de quando é a informação. "
+                "Se não tiver a resposta, busque de novo com outras palavras ou diga que não encontrou."
+            )
         despedida = eh_despedida(texto, ja_conversou=bool(self.memoria.turnos))
         if despedida:
             avisos.append("ele está se despedindo: responda com uma despedida curta e natural.")
@@ -52,6 +60,18 @@ class Athena:
         enviadas: list[dict] = [{"role": "user", "content": f"{contexto}\n\n{texto}"}]
         resposta_final = ""
         metricas: dict = {}
+
+        if busca_automatica:
+            # O modelo decide mal quando buscar (testado: ignorou o aviso e inventou
+            # a versão do Ollama). Então o código busca antes, como se ela tivesse
+            # chamado a ferramenta, e ela segue livre pra buscar de novo.
+            args = {"consulta": texto, "tipo": tipo_de_busca(texto)}
+            yield Evento("ferramenta", {"nome": "buscar_web", "argumentos": args})
+            chamada = {"role": "assistant", "content": "",
+                       "tool_calls": [{"function": {"name": "buscar_web", "arguments": args}}]}
+            resultado = {"role": "tool", "content": fer.executar("buscar_web", args), "tool_name": "buscar_web"}
+            enviadas += [chamada, resultado]
+            turno += [chamada, resultado]
 
         for _ in range(MAX_RODADAS_FERRAMENTA):
             mensagens = [self.system, *self.memoria.mensagens(), *enviadas]
@@ -76,7 +96,7 @@ class Athena:
                 resposta_final = resposta
                 break
             for c in chamadas:
-                yield Evento("ferramenta", c.nome)
+                yield Evento("ferramenta", {"nome": c.nome, "argumentos": c.argumentos})
                 resultado = fer.executar(c.nome, c.argumentos)
                 m = {"role": "tool", "content": resultado, "tool_name": c.nome}
                 enviadas.append(m)

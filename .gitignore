@@ -9,8 +9,10 @@ modelos/
 # Dados da Athena (estado emocional, diário de conversas, memória vetorial)
 data/
 
-# Dados pessoais
+# Dados pessoais e segredos (chaves de API)
 config/perfil.md
+.env
+.env.*
 
 # Python
 .venv/

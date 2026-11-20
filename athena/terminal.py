@@ -4,7 +4,10 @@ from __future__ import annotations
 import json
 import sys
 
+from urllib.parse import urlparse
+
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 
 from .nucleo import Athena
@@ -15,6 +18,15 @@ AJUDA = """[bold]Comandos[/]
   /metricas  liga/desliga o tempo de resposta e tokens/s
   /limpar    esquece a conversa atual (o estado emocional continua)
   /sair      encerra"""
+
+
+def _descrever_ferramenta(dado: dict) -> str:
+    args = dado.get("argumentos") or {}
+    if dado["nome"] == "buscar_web":
+        return f"🔎 buscando: {escape(str(args.get('consulta', '')))}..."
+    if dado["nome"] == "ler_pagina":
+        return f"📄 lendo {escape(urlparse(str(args.get('url', ''))).netloc)}..."
+    return f"⚙ {dado['nome']}..."
 
 
 def rodar(athena: Athena) -> None:
@@ -96,7 +108,7 @@ def _loop(athena: Athena, console: Console) -> None:
                     sys.stdout.write(ev.dado)
                     sys.stdout.flush()
                 elif ev.tipo == "ferramenta":
-                    console.print(f"[dim]⚙ {ev.dado}...[/] ", end="")
+                    console.print(f"[dim]{_descrever_ferramenta(ev.dado)}[/] ", end="", markup=True, highlight=False)
                 elif ev.tipo == "despedida":
                     tchau = True
                 elif ev.tipo == "aviso":

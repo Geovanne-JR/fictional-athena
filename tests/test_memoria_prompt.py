@@ -1,7 +1,34 @@
 from datetime import datetime
 
 from athena.memoria import MemoriaCurta
-from athena.prompt import analisar_repeticao, bloco_contexto
+import pytest
+
+from athena.prompt import analisar_repeticao, bloco_contexto, pede_atualidade
+
+
+@pytest.mark.parametrize("texto", [
+    "quem ganhou o último jogo do flamengo?",
+    "qual a versão mais recente do ollama?",
+    "o que rolou de notícia sobre a UnB essa semana?",
+    "quanto tá o dólar?",
+    "vai chover hoje em Brasília?",
+])
+def test_pede_atualidade(texto):
+    assert pede_atualidade(texto)
+
+
+@pytest.mark.parametrize("texto", [
+    "qual a diferença entre lista e tupla em python?",
+    "me explica integral por partes",
+    "e aí, tudo certo?",
+    # falsos positivos apontados na revisão do Antigravity
+    "como você está hoje?",
+    "qual o resultado de 2+2?",
+    "cria uma tabela com meus horários",
+    "minha placa antiga era uma RTX 2060",
+])
+def test_nao_pede_atualidade(texto):
+    assert not pede_atualidade(texto)
 
 
 def _turno(i: int, tamanho: int = 300):
@@ -32,6 +59,22 @@ def test_memoria_nao_deixa_ferramenta_orfa():
     for i in range(3):
         mem.adicionar_turno(_turno(i, 50))
     assert mem.mensagens()[0]["role"] == "user"
+
+
+def test_busca_entra_compacta_no_historico():
+    import json
+    busca = json.dumps({"consulta": "flamengo", "resultados": [
+        {"titulo": f"t{i}", "url": f"https://x/{i}", "trecho": "z" * 300, "conteudo": "w" * 2000} for i in range(5)
+    ]})
+    mem = MemoriaCurta(orcamento_tokens=100_000)
+    mem.adicionar_turno([
+        {"role": "user", "content": "e o flamengo?"},
+        {"role": "tool", "content": busca, "tool_name": "buscar_web"},
+        {"role": "assistant", "content": "ganhou"},
+    ])
+    guardado = mem.mensagens()[1]["content"]
+    assert len(guardado) < 600
+    assert json.loads(guardado)["resultados"][0] == {"titulo": "t0", "url": "https://x/0"}
 
 
 def test_aviso_quando_respostas_comecam_igual():

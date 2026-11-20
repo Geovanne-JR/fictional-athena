@@ -58,10 +58,9 @@ Isso decide a Etapa 4: o Whisper `large-v3-turbo` int8 (~1,5 GB) cabe apertado. 
 Feito: Ollama, Gemma 4, persona nova, motor emocional, anti-repetição, memória por tokens, diário, tool calling (`status_do_pc`), diagnóstico de GPU, testes.
 Próximo ajuste fino: conversar bastante, ler `data/conversas/*.jsonl` e calibrar `persona.md` e os pesos de `estado.py`.
 
-### Etapa 2 — Internet
-- Ferramenta `buscar_web` com `ddgs` (DuckDuckGo, sem chave) + `trafilatura` pra extrair o texto das páginas.
-- Se a qualidade for fraca: Tavily (tem plano grátis, retorna texto já limpo).
-- Regra na persona: fato recente → buscar antes de responder, citar a fonte.
+### Etapa 2 — Internet ✅
+Feito: `buscar_web` (ddgs, notícias datadas + busca geral, lê as 2 primeiras páginas) e `ler_pagina` (trafilatura, bloqueio de rede interna). Busca **forçada pelo código** quando a pergunta é sobre algo atual, porque o modelo sozinho decidia mal. Detalhes, testes e limites: [decisoes/002](decisoes/002-busca-web-automatica.md).
+Próximo, se o buscador grátis incomodar: Tavily ou SearXNG.
 
 ### Etapa 2.5 — No bolso (Android)
 - Servidor FastAPI + WebSocket no PC, repassando os Eventos do núcleo.

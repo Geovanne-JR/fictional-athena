@@ -71,6 +71,35 @@ def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[s
     return avisos
 
 
+# Só termos fortes. Palavras soltas como "hoje", "agora" ou "resultado" disparavam
+# busca em "como você está hoje?" e "resultado de 2+2" (achado da revisão do Antigravity).
+_PEDE_ATUALIDADE = re.compile(
+    r"\b(ultim[oa]s? (jogo|partida|noticia|versao|lancamento|resultado|episodio|temporada)|"
+    r"(jogo|noticias?|cotacao|previsao|placar) de (hoje|ontem)|"
+    r"essa semana|esta semana|esse mes|este mes|noticias?|novidades?|lancamento|lancou|"
+    r"versao mais recente|versao atual|precos?|quanto (ta|esta|custa)|cotacao|placar|"
+    r"resultado do jogo|quem ganhou|ganhou|perdeu|empatou|classificacao|previsao do tempo|vai chover)\b"
+)
+
+
+def pede_atualidade(texto: str) -> bool:
+    """Heurística barata: a pergunta parece depender de informação atual?
+    O modelo sozinho decide mal quando buscar (inventou versão do Ollama e
+    "pesquisou" notícias sem chamar a ferramenta). Falso positivo custa só
+    uma busca a mais (~3s); falso negativo custa uma resposta inventada."""
+    return bool(_PEDE_ATUALIDADE.search(_norm(texto)))
+
+
+_PEDE_NOTICIA = re.compile(
+    r"\b(jogo|jogou|ganhou|perdeu|empatou|placar|resultado|noticias?|novidades?|essa semana|esta semana|hoje|ontem)\b"
+)
+
+
+def tipo_de_busca(texto: str) -> str:
+    """'noticias' para acontecimentos (jogos, notícias); 'geral' para o resto (versões, preços...)."""
+    return "noticias" if _PEDE_NOTICIA.search(_norm(texto)) else "geral"
+
+
 def bloco_contexto(agora: datetime, descricao_estado: str, avisos: list[str]) -> str:
     linhas = [
         "[contexto — privado, não mencione]",
