@@ -13,11 +13,18 @@ O dono do projeto (Gegê) toma todas as decisões finais. Nenhuma IA muda o rumo
 |---|---|---|
 | Claude Code | Arquiteto e implementação; mantém `docs/ARQUITETURA.md` | Sim |
 | Antigravity CLI / Gemini | Revisor: revisa cada entrega (bugs, riscos, alternativas) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
-| IBM Bob (Bob Shell) | Auditor: auditoria de segurança e qualidade nos marcos do projeto (fim de etapa, antes de ferramentas que alteram o sistema) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
+| IBM Bob (Bob Shell) | Auditor e segundo revisor: segurança, qualidade e arquitetura (ver regras abaixo) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
 
 Revisor e auditor: trabalhem em modo somente leitura (`plan` no Antigravity, `ask` no Bob). Entreguem os achados como lista (arquivo:linha, problema, por que importa, sugestão). Discordar da arquitetura é bem-vindo, mas com argumento, não com reescrita. Quem implementa testa cada achado antes de aceitar; os rejeitados são registrados com o motivo em `docs/decisoes/`.
 
-O Bob roda num teste com créditos limitados (Bobcoins): auditorias focadas num diff ou numa área, nunca "revise o repositório inteiro".
+### Regras do Bob
+O Bob tem bastante poder de fogo e pode ser usado além dos marcos, mas sempre com rédea:
+- **Quando usar:** auditoria de segurança em toda entrega que toque rede, segredos, servidor ou ferramentas do sistema; segunda revisão de entregas grandes (junto com o Antigravity); debate de arquitetura e de próximos passos; desenho de testes; revisão de docs de decisão.
+- **Sempre somente leitura:** `bob run --mode ask --disable-tool-groups "edit,command,browser,mcp" --disable-mcp --disable-subagents`. O `bob run` pré-aprova ferramentas, então os grupos ficam bloqueados mesmo em modo `ask`.
+- **Teto por chamada:** `--max-cost 3` e `--max-turns 30`; acima disso, só com o "ok" do Gegê.
+- **Escopo explícito:** cada chamada diz o que olhar (arquivos, diff ou pergunta). Repositório inteiro só se o Gegê pedir.
+- **Chave:** a `BOB_API_KEY` vai só para o processo do Bob e é apagada da sessão em seguida. A Athena nunca a lê.
+- **Custo registrado:** o gasto de cada rodada entra no registro em `docs/decisoes/`.
 
 ## Comandos
 - Rodar: `.\.venv\Scripts\python -m athena`
