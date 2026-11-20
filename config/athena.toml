@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════
+#  Athena 3.0 — configuração principal
+#  Tudo que é "ajuste fino" mora aqui, não no código.
+# ═══════════════════════════════════════════════════════════
+
+[modelo]
+# Cérebro padrão. Alternativas testadas em docs/ARQUITETURA.md:
+#   "qwen3.5:9b"          → mais rápido, melhor em ferramentas/código
+#   "gemma4:26b-a4b-it-qat" → mais inteligente, mas transborda a VRAM (mais lento)
+nome = "gemma4:12b-it-qat"
+host = "http://127.0.0.1:11434"
+# Janela de contexto. 16k cabe com folga na 3060 junto com o modelo.
+# Mudar isso faz o Ollama recarregar o modelo.
+num_ctx = 16384
+# Quanto tempo o modelo fica na VRAM depois da última mensagem.
+# Depois disso ele sai e libera a placa pra jogar.
+keep_alive = "20m"
+# Raciocínio estendido ("thinking"): mais inteligente, bem mais lento.
+# Dá pra alternar no chat com /pensar.
+pensar = false
+
+[amostragem]
+temperature = 0.85
+top_p = 0.95
+top_k = 64
+repeat_penalty = 1.05
+
+[memoria]
+# Orçamento de tokens do histórico da conversa (memória de curto prazo).
+orcamento_historico_tokens = 8000
+pasta_dados = "data"
+
+[persona]
+arquivo = "config/persona.md"
+perfil_usuario = "config/perfil.md"
+nome_usuario = "Gegê"
+# Temas que a v2.0 repetia até cansar. O anti-repetição vigia esses
+# e manda ela largar o assunto se ela puxar sozinha várias vezes.
+temas_vigiados = ["flamengo", "mengão", "nuvem", "aws", "azure", "rtx", "3060", "silício", "vram"]
+
+[ferramentas]
+ativas = true
