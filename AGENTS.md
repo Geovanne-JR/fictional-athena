@@ -1,6 +1,6 @@
 # Projeto Olimpo — regras para assistentes de IA
 
-Fonte única de regras para todas as IAs que trabalham neste repositório (Claude Code, Antigravity/Gemini e outras).
+Fonte única de regras para todas as IAs que trabalham neste repositório (Claude Code, Codex, Antigravity/Gemini, IBM Bob e outras).
 `CLAUDE.md` só aponta para este arquivo.
 
 Athena 3.0: IA pessoal local (Python 3.11 + Ollama + gemma4:12b-it-qat numa RTX 3060 12GB, Windows 11).
@@ -11,11 +11,22 @@ O dono do projeto (Gegê) toma todas as decisões finais. Nenhuma IA muda o rumo
 
 | IA | Papel | Pode editar arquivos? |
 |---|---|---|
-| Claude Code | Arquiteto e implementação; mantém `docs/ARQUITETURA.md` | Sim |
+| Claude Code | Arquiteto: desenho, divisão de tarefas, integração e validação; mantém `docs/ARQUITETURA.md` | Sim |
+| Codex (OpenAI) | Implementação de tarefas delegadas, depuração, testes e revisão independente de desenho | Sim, só no escopo da tarefa delegada |
 | Antigravity CLI / Gemini | Revisor: revisa cada entrega (bugs, riscos, alternativas) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
 | IBM Bob (Bob Shell) | Auditor e segundo revisor: segurança, qualidade e arquitetura (ver regras abaixo) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
 
 Revisor e auditor: trabalhem em modo somente leitura (`plan` no Antigravity, `ask` no Bob). Entreguem os achados como lista (arquivo:linha, problema, por que importa, sugestão). Discordar da arquitetura é bem-vindo, mas com argumento, não com reescrita. Quem implementa testa cada achado antes de aceitar; os rejeitados são registrados com o motivo em `docs/decisoes/`.
+
+### Regras do Codex
+- Trabalha a partir de uma tarefa com escopo definido (arquivos, critério de pronto, testes esperados), escrita pelo Claude ou pelo Gegê.
+- Pode propor alternativas de arquitetura e apontar problemas, mas não muda decisões registradas em `docs/decisoes/` sem autorização do Gegê.
+- Por enquanto, em sequência: nunca edita os mesmos arquivos que outra IA ao mesmo tempo. Trabalho em paralelo só depois, em branches ou worktrees separados.
+- Permissões: sandbox restrita ao repositório (`--sandbox workspace-write` para implementar, `read-only` para analisar); aprovação para qualquer coisa fora disso. Nunca acesso irrestrito.
+- Uma tarefa só termina com testes passando e revisão do Claude. Correção pequena não precisa passar por todas as IAs.
+
+### Fluxo
+Gegê (com Gemini/ChatGPT como consultores externos) define o problema → Claude desenha e divide → Codex implementa ou revisa → Claude integra e valida (inclusive ao vivo) → Antigravity e Bob revisam quando couber → Gegê aprova. **Nenhum agente faz `git commit` ou `git push` sem aprovação explícita do Gegê.**
 
 ### Regras do Bob
 O Bob tem bastante poder de fogo e pode ser usado além dos marcos, mas sempre com rédea:
