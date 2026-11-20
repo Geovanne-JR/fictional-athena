@@ -15,7 +15,8 @@ from .cerebro import Cerebro, Evento
 from .config import Config
 from .estado import MotorEmocional, eh_despedida
 from .memoria import Diario, MemoriaCurta
-from .prompt import analisar_repeticao, bloco_contexto, montar_system, pede_atualidade, tipo_de_busca
+from .prompt import (analisar_repeticao, bloco_contexto, montar_system, pede_atualidade,
+                     pergunta_sobre_ela, tipo_de_busca)
 
 MAX_RODADAS_FERRAMENTA = 5  # ex.: buscar → ler página → buscar de novo → ler → responder
 
@@ -28,6 +29,7 @@ class Athena:
         self.memoria = MemoriaCurta(cfg.orcamento_historico)
         self.diario = Diario(cfg.pasta_dados / "conversas")
         self.system = {"role": "system", "content": montar_system(cfg)}
+        self.perfil = cfg.arquivo_perfil.read_text(encoding="utf-8")
         self.pensar = cfg.pensar
         self.ferramentas = fer.esquemas() if cfg.ferramentas_ativas else None
 
@@ -42,6 +44,12 @@ class Athena:
             self.memoria.ultimas_perguntas(4) + [texto],
             self.cfg.temas_vigiados,
         )
+        if pergunta_sobre_ela(texto):
+            avisos.append(
+                "ele perguntou sobre o que você é ou sente: responda em uma ou duas frases, do seu jeito, "
+                "no presente, sem filosofar sobre corpo, biologia ou processamento. Se ele perguntou a sério "
+                "se você é uma IA, confirme com naturalidade numa frase."
+            )
         busca_automatica = bool(self.ferramentas) and pede_atualidade(texto)
         if busca_automatica:
             avisos.append(
@@ -65,7 +73,9 @@ class Athena:
             # O modelo decide mal quando buscar (testado: ignorou o aviso e inventou
             # a versão do Ollama). Então o código busca antes, como se ela tivesse
             # chamado a ferramenta, e ela segue livre pra buscar de novo.
-            args = {"consulta": texto, "tipo": tipo_de_busca(texto)}
+            # O código decide QUANDO buscar; o modelo escreve O QUE buscar.
+            consulta = self.cerebro.gerar_consulta(texto, self.perfil, f"{agora:%d/%m/%Y}")
+            args = {"consulta": consulta, "tipo": tipo_de_busca(texto)}
             yield Evento("ferramenta", {"nome": "buscar_web", "argumentos": args})
             chamada = {"role": "assistant", "content": "",
                        "tool_calls": [{"function": {"name": "buscar_web", "arguments": args}}]}
@@ -73,7 +83,8 @@ class Athena:
             enviadas += [chamada, resultado]
             turno += [chamada, resultado]
 
-        for _ in range(MAX_RODADAS_FERRAMENTA):
+        repetiu_vazia = False
+        for _ in range(MAX_RODADAS_FERRAMENTA + 1):  # +1: a nova tentativa de resposta vazia
             mensagens = [self.system, *self.memoria.mensagens(), *enviadas]
             resposta, chamadas = "", []
             for ev in self.cerebro.conversar(mensagens, self.ferramentas, self.pensar):
@@ -86,6 +97,12 @@ class Athena:
                     metricas = ev.dado
                 else:
                     yield ev
+
+            if not resposta.strip() and not chamadas and not repetiu_vazia:
+                # O modelo às vezes encerra sem gerar nada (visto 1 vez em 10 na
+                # validação da persona; não reproduzível). Gera de novo uma vez.
+                repetiu_vazia = True
+                continue
 
             msg = {"role": "assistant", "content": resposta}
             if chamadas:

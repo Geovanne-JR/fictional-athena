@@ -12,9 +12,12 @@ O dono do projeto (Gegê) toma todas as decisões finais. Nenhuma IA muda o rumo
 | IA | Papel | Pode editar arquivos? |
 |---|---|---|
 | Claude Code | Arquiteto e implementação; mantém `docs/ARQUITETURA.md` | Sim |
-| Antigravity CLI / Gemini | Revisor: aponta bugs, riscos e alternativas com justificativa | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
+| Antigravity CLI / Gemini | Revisor: revisa cada entrega (bugs, riscos, alternativas) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
+| IBM Bob (Bob Shell) | Auditor: auditoria de segurança e qualidade nos marcos do projeto (fim de etapa, antes de ferramentas que alteram o sistema) | **Não**, a menos que o Gegê peça explicitamente naquela conversa |
 
-Revisor: trabalhe em modo `plan`. Entregue os achados como lista (arquivo:linha, problema, por que importa, sugestão). Discordar da arquitetura é bem-vindo, mas com argumento, não com reescrita.
+Revisor e auditor: trabalhem em modo somente leitura (`plan` no Antigravity, `ask` no Bob). Entreguem os achados como lista (arquivo:linha, problema, por que importa, sugestão). Discordar da arquitetura é bem-vindo, mas com argumento, não com reescrita. Quem implementa testa cada achado antes de aceitar; os rejeitados são registrados com o motivo em `docs/decisoes/`.
+
+O Bob roda num teste com créditos limitados (Bobcoins): auditorias focadas num diff ou numa área, nunca "revise o repositório inteiro".
 
 ## Comandos
 - Rodar: `.\.venv\Scripts\python -m athena`

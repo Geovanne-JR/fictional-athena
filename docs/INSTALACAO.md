@@ -23,6 +23,20 @@ copy config\perfil.exemplo.md config\perfil.md
 ```
 Edite o `config/perfil.md` com quem você é. Ele fica fora do git.
 
+**Busca na web (opcional, recomendado):** crie uma conta grátis em [tavily.com](https://www.tavily.com) e crie um arquivo `.env` na raiz do projeto:
+```
+TAVILY_API_KEY=tvly-sua-chave
+```
+Ele fica fora do git. Sem a chave, a Athena usa o DuckDuckGo, que é pior mas funciona.
+
+## 3.1 Limitar o cache do Ollama (evita quedas)
+Sem isso, o motor pode cair por falta de RAM em PCs com muitos apps abertos ([decisoes/005](decisoes/005-limite-do-cache-de-prompts.md)):
+```powershell
+[Environment]::SetEnvironmentVariable("LLAMA_ARG_CACHE_RAM", "2048", "User")
+[Environment]::SetEnvironmentVariable("LLAMA_ARG_CTX_CHECKPOINTS", "8", "User")
+```
+Depois, feche o Ollama pela bandeja do Windows e abra de novo.
+
 ## 4. Diagnóstico
 ```powershell
 .\.venv\Scripts\python scripts\diagnostico.py

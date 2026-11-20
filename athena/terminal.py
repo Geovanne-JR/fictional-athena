@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 from urllib.parse import urlparse
@@ -34,11 +35,18 @@ def rodar(athena: Athena) -> None:
     console = Console()
 
     console.print(Panel.fit(
-        f"[bold magenta]ATHENA 3.0[/] · Projeto Olimpo\n[dim]cérebro: {athena.cerebro.modelo}[/]",
+        f"[bold magenta]ATHENA 3.0[/] · Projeto Olimpo\n[dim]cérebro: {athena.cerebro.modelo} · "
+        f"busca: {'Tavily (+DuckDuckGo de reserva)' if os.environ.get('TAVILY_API_KEY') else 'DuckDuckGo'}[/]",
         border_style="magenta",
     ))
 
-    if not athena.cerebro.modelo_instalado():
+    try:
+        instalado = athena.cerebro.modelo_instalado()
+    except Exception:  # Ollama fechado: ConnectionError do httpx
+        console.print(f"[red]Não consegui falar com o Ollama em {athena.cfg.host}.[/] "
+                      "Abra o app Ollama (ou rode [bold]ollama serve[/]) e tente de novo.")
+        return
+    if not instalado:
         console.print(f"[red]Modelo '{athena.cerebro.modelo}' não encontrado.[/] "
                       f"Rode: [bold]ollama pull {athena.cerebro.modelo}[/]")
         return

@@ -41,7 +41,7 @@ def compactar_ferramenta(conteudo: str) -> str:
         dados = None
     if isinstance(dados, dict) and isinstance(dados.get("resultados"), list):
         refs = [{k: r[k] for k in ("titulo", "url", "data") if r.get(k)} for r in dados["resultados"]]
-        return json.dumps({"consulta": dados.get("consulta"), "resultados": refs,
+        return json.dumps({"consulta": dados.get("consulta"), "fonte_busca": dados.get("fonte_busca"), "resultados": refs,
                            "obs": "conteúdo das páginas omitido no histórico"}, ensure_ascii=False)
     if isinstance(dados, dict) and "texto" in dados:
         return json.dumps({"url": dados.get("url"), "obs": "texto da página omitido no histórico"},

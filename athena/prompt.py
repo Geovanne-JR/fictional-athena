@@ -47,6 +47,28 @@ def _abertura(texto: str, n: int = 3) -> str:
     return " ".join(palavras[:n])
 
 
+# Frases que denunciam "atendente/IA" em vez de amiga (medido na conversa de base:
+# "como eu não tenho ouvidos", "da melhor forma que uma IA pode", "sinto muito pelo que aconteceu").
+# Só formas em que ela fala DE SI como máquina ou como atendente. Termos técnicos
+# ("base de dados" numa dúvida de SQL) e o "sou uma IA" honesto não contam
+# (achados da revisão do Antigravity).
+_FALA_DE_ROBO = re.compile(
+    r"\b(como (uma )?ia,|da melhor forma que uma ia|como (um )?modelo de linguagem|"
+    r"(eu )?nao tenho (um )?(corpo|ouvidos|olhos|biologia)|minha base de dados|meus dados de treinamento|"
+    r"resultados da (minha )?(busca|pesquisa)|minhas ferramentas|assistente virtual|"
+    r"como posso (te )?ajudar|espero ter ajudado|fico a disposicao|sinto muito pelo que aconteceu)\b"
+)
+
+
+# Ela falando DE SI no masculino ("obrigado", "tô cansado", "fiquei curioso").
+# Só verbos inequívocos de primeira pessoa: "tava/estava" também servem pra
+# "ele tava cansado", e "tá" é "você tá"/"ele tá", então ficam de fora.
+_MASCULINO_DE_SI = re.compile(
+    r"\bobrigado\b|\b(to|estou|fiquei|fico|ando) (meio |bem |muito |um pouco |super )?"
+    r"(cansado|animado|pronto|curioso|preocupado|orgulhoso|ocupado|entediado|confuso|chateado|empolgado)\b"
+)
+
+
 def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[str]) -> list[str]:
     """Olha as últimas respostas dela e devolve avisos curtos pro [contexto]."""
     avisos: list[str] = []
@@ -60,6 +82,14 @@ def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[s
     finais_com_pergunta = sum(1 for r in respostas[-3:] if r.rstrip().endswith("?"))
     if finais_com_pergunta >= 2:
         avisos.append("você tem terminado as respostas com pergunta; desta vez termine sem perguntar nada.")
+
+    # Só a última resposta: olhando as duas últimas, um deslize já corrigido
+    # continuava gerando aviso no turno seguinte (achado da revisão do Antigravity).
+    ultima = _norm(respostas[-1]) if respostas else ""
+    if m := _FALA_DE_ROBO.search(ultima):
+        avisos.append(f'você soou como máquina ("{m.group(0)}"); fale como gente, sem falar do que você é.')
+    if m := _MASCULINO_DE_SI.search(ultima):
+        avisos.append(f'você falou de si no masculino ("{m.group(0)}"); você é mulher: fale de si no feminino.')
 
     perguntas_norm = " ".join(_norm(p) for p in perguntas)
     respostas_norm = [_norm(r) for r in respostas[-4:]]
@@ -90,8 +120,29 @@ def pede_atualidade(texto: str) -> bool:
     return bool(_PEDE_ATUALIDADE.search(_norm(texto)))
 
 
+# Verbos como "pensa" e "sente" só contam com objeto de natureza/emoção ou no fim
+# da pergunta: "o que você pensa sobre Rust?" não é pergunta sobre ela.
+_PERGUNTA_SOBRE_ELA = re.compile(
+    r"\bvoce (tem|sente)\b.*\b(sentimentos?|emoc\w*|alma|consciencia)\b|"
+    r"\bvoce sente (as coisas|algo|alguma coisa|de verdade)\b|\bvoce sente\s*\??$|"
+    r"\bvoce (e|eh) (um |uma )?(ia|robo|maquina|modelo|inteligencia artificial|real|consciente|humana|de verdade)\b|"
+    r"\bvoce (pensa|existe|sonha) de verdade\b|\bvoce (pensa|existe|sonha)\s*\??$"
+)
+
+
+def pergunta_sobre_ela(texto: str) -> bool:
+    """Ele perguntou o que ela é ou se ela sente. É exatamente aí que o modelo
+    escorrega pra "não tenho corpo nem biologia" (medido), mesmo com a regra na
+    persona. O aviso vai ANTES da resposta, porque avisar depois não adianta pra
+    algo que acontece uma vez só."""
+    return bool(_PERGUNTA_SOBRE_ELA.search(_norm(texto)))
+
+
+# Só acontecimentos. "hoje"/"ontem"/"resultado" soltos mandavam "versão do Ollama
+# hoje" pra busca de notícias da semana (achado da revisão do Antigravity).
 _PEDE_NOTICIA = re.compile(
-    r"\b(jogo|jogou|ganhou|perdeu|empatou|placar|resultado|noticias?|novidades?|essa semana|esta semana|hoje|ontem)\b"
+    r"\b(jogo|jogou|partida|ganhou|perdeu|empatou|placar|resultado do jogo|noticias?|novidades?|"
+    r"aconteceu|rolou|essa semana|esta semana)\b"
 )
 
 

@@ -225,7 +225,8 @@ class MotorEmocional:
 
         clima = {
             "estressado": f"{nome_usuario} parece estressado ou sob pressão: foco total em ajudar, objetiva.",
-            "triste": f"{nome_usuario} parece pra baixo: seja gentil e presente, sem sermão.",
+            "triste": f"{nome_usuario} parece pra baixo: reaja como amiga, curto e querendo saber o que houve. "
+                      "Nada de discurso de apoio nem cardápio de ajuda; se ele pedir conselho ou ajuda, aí ajude de verdade.",
             "animado": f"{nome_usuario} está animado: pode acompanhar a energia dele.",
             "rispido_com_voce": f"{nome_usuario} foi ríspido com você: pode mostrar de leve que não curtiu, sem drama, e siga ajudando.",
         }.get(e.clima_usuario)

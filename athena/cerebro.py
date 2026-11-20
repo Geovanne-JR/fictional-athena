@@ -12,6 +12,7 @@ Por que Ollama e não llama-cpp-python (v2.0)?
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -98,6 +99,29 @@ class Cerebro:
         )
         return time.perf_counter() - t
 
+    def gerar_consulta(self, pergunta: str, contexto_usuario: str, hoje: str) -> str:
+        """Reescreve a pergunta como consulta de busca curta. A pergunta crua dá
+        consulta ruim ("o que rolou... UnB" achava a universidade do Canadá).
+        Em caso de erro devolve a pergunta original."""
+        system = (
+            "Você transforma a pergunta do usuário numa consulta curta para um buscador da web, em português do Brasil. "
+            "Expanda siglas e nomes usando o perfil do usuário. Use 'resultado' ou 'placar' só para jogos, "
+            "'notícias' só para acontecimentos, e para software use o nome em inglês com 'latest release'. "
+            "Responda SÓ a consulta, sem aspas, sem explicação. Hoje é " + hoje + ".\n\n" + contexto_usuario
+        )
+        try:
+            r = self.cliente.chat(
+                model=self.modelo,
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": pergunta}],
+                options={**self.cfg.opcoes_ollama, "temperature": 0.2, "num_predict": 40},
+                keep_alive=self.cfg.keep_alive,
+                **({"think": False} if self._aceita_think else {}),
+            )
+            consulta = extrair_consulta(r.message.content or "")
+        except Exception:
+            return pergunta
+        return consulta if 2 <= len(consulta) <= 200 else pergunta
+
     def descarregar(self) -> bool:
         """Tira o modelo da VRAM na hora (keep_alive=0). Retorna False se o Ollama não respondeu."""
         try:
@@ -108,14 +132,27 @@ class Cerebro:
 
     def uso_de_gpu(self) -> float | None:
         """Fração do modelo carregado que está na VRAM (1.0 = tudo na GPU)."""
+        nomes = {self.modelo, f"{self.modelo}:latest"}  # "--modelo qwen3.5" aparece como "qwen3.5:latest"
         for m in self.cliente.ps().models:
-            if m.model == self.modelo or m.name == self.modelo:
+            if m.model in nomes or m.name in nomes:
                 return (m.size_vram or 0) / m.size if m.size else None
         return None
 
     def modelo_instalado(self) -> bool:
         nomes = {m.model for m in self.cliente.list().models}
         return self.modelo in nomes or f"{self.modelo}:latest" in nomes
+
+
+def extrair_consulta(resposta: str) -> str:
+    """Primeira linha útil da resposta do modelo. Pula cerca de código, tags
+    (<think>), preâmbulo ("Aqui está a consulta:") e tira aspas."""
+    resposta = re.sub(r"<think>.*?</think>", "", resposta, flags=re.DOTALL)
+    for linha in resposta.splitlines():
+        linha = linha.strip().strip("\"'`*").strip()
+        if not linha or linha.startswith(("```", "<")) or linha.endswith(":"):
+            continue
+        return re.sub(r"^(consulta|busca|query)\s*:\s*", "", linha, flags=re.IGNORECASE).strip("\"'` ")
+    return ""
 
 
 def _metricas(parte, primeiro_token: float | None, total: float) -> dict:

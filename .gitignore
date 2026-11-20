@@ -14,6 +14,9 @@ config/perfil.md
 .env
 .env.*
 
+# Briefing de trabalho pra outras IAs (fica desatualizado; não é documentação do projeto)
+CONTEXTO_GEMINI.md
+
 # Python
 .venv/
 __pycache__/

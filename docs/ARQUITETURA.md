@@ -31,6 +31,10 @@
 | **Anti-repetição no código** | Detecta aberturas repetidas, respostas que sempre terminam em pergunta e temas puxados sem ninguém pedir, e manda um aviso no `[contexto]`. Regra no prompt sozinha não segura modelo pequeno. |
 | **Núcleo emite eventos, não imprime** | Voz e HUD plugam no mesmo `responder()`. |
 | **Diário jsonl de tudo** | Matéria-prima da memória de longo prazo (Etapa 3), sem precisar decidir o framework agora. |
+| **Quando o modelo decide mal, o código decide** | Ex.: quando buscar na web. O modelo ignorava o aviso e inventava respostas ([002](decisoes/002-busca-web-automatica.md)). |
+| **Aviso antes da resposta > exemplo > regra** | Num modelo de 12B, regra no prompt é fraca. O código detecta a situação (pergunta sobre ela, ele triste, pergunta sobre algo atual) e orienta aquele turno ([004](decisoes/004-persona-humana.md)). |
+| **Libera a VRAM ao sair** | O Gegê joga no mesmo PC: despedida, `/sair` ou 5 min parada descarregam o modelo. |
+| **Cache de prompts limitado** | O llama-server caía por falta de RAM ([005](decisoes/005-limite-do-cache-de-prompts.md)). |
 
 ## Modelos: alternativas
 
@@ -50,7 +54,7 @@ Troca rápida: `athena --modelo qwen3.5:9b`.
 | Gemma 4 12B + 16k de contexto | ~8,3 GB |
 | **Sobra** | **~2 GB** |
 
-Isso decide a Etapa 4: o Whisper `large-v3-turbo` int8 (~1,5 GB) cabe apertado. Se não couber, roda na CPU (o Ryzen 5600 aguenta o `small`/`turbo`). O Piper TTS roda na CPU. O `keep_alive = "20m"` tira o modelo da VRAM quando você vai jogar.
+Isso decide a Etapa 4: o Whisper `large-v3-turbo` int8 (~1,5 GB) cabe apertado. Se não couber, roda na CPU (o Ryzen 5600 aguenta o `small`/`turbo`). O Piper TTS roda na CPU. A VRAM toda é liberada quando a Athena se despede ou fica 5 min parada, então ela não atrapalha os jogos.
 
 ## Roadmap
 
@@ -60,7 +64,8 @@ Próximo ajuste fino: conversar bastante, ler `data/conversas/*.jsonl` e calibra
 
 ### Etapa 2 — Internet ✅
 Feito: `buscar_web` (ddgs, notícias datadas + busca geral, lê as 2 primeiras páginas) e `ler_pagina` (trafilatura, bloqueio de rede interna). Busca **forçada pelo código** quando a pergunta é sobre algo atual, porque o modelo sozinho decidia mal. Detalhes, testes e limites: [decisoes/002](decisoes/002-busca-web-automatica.md).
-Próximo, se o buscador grátis incomodar: Tavily ou SearXNG.
+Buscador principal: **Tavily** (1.000 buscas/mês grátis), com o DuckDuckGo de reserva. O modelo escreve a consulta e o código decide quando buscar: [decisoes/003](decisoes/003-tavily-como-buscador-principal.md).
+Também no fechamento da etapa: persona humana ([004](decisoes/004-persona-humana.md)), correção das quedas do llama-server ([005](decisoes/005-limite-do-cache-de-prompts.md)) e persona feminina + auditoria tripla ([006](decisoes/006-auditoria-fim-da-etapa-2.md)).
 
 ### Etapa 2.5 — No bolso (Android)
 - Servidor FastAPI + WebSocket no PC, repassando os Eventos do núcleo.

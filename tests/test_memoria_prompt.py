@@ -3,7 +3,28 @@ from datetime import datetime
 from athena.memoria import MemoriaCurta
 import pytest
 
-from athena.prompt import analisar_repeticao, bloco_contexto, pede_atualidade
+from athena.prompt import analisar_repeticao, bloco_contexto, pede_atualidade, pergunta_sobre_ela, tipo_de_busca
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("você tem sentimentos de verdade?", True),
+    ("você sente as coisas?", True),
+    ("você é uma IA, né?", True),
+    ("você é real?", True),
+    ("você tem alguma emoção?", True),
+    ("você pensa?", True),
+    ("você é um robô?", True),                  # revisão do Antigravity: "um" não casava
+    ("você é inteligência artificial?", True),
+    ("você sentiu falta de mim?", False),       # pergunta pessoal normal, não sobre a natureza dela
+    ("você é boa em cálculo?", False),
+    ("o que você acha do Rust?", False),
+    # falsos positivos apontados na revisão do Antigravity
+    ("o que você pensa sobre Rust?", False),
+    ("você sente que essa query tá lenta?", False),
+    ("o que você e o Gemini acham disso?", False),
+])
+def test_pergunta_sobre_ela(texto, esperado):
+    assert pergunta_sobre_ela(texto) is esperado
 
 
 @pytest.mark.parametrize("texto", [
@@ -94,6 +115,69 @@ def test_aviso_quando_ela_termina_tudo_com_pergunta():
     respostas = ["Isso é heap. Quer exemplo?", "Feito. Mais alguma coisa?", "Pronto."]
     avisos = analisar_repeticao(respostas, ["x"], [])
     assert any("termine sem perguntar" in a for a in avisos)
+
+
+@pytest.mark.parametrize("resposta", [
+    "Gosto sim, mas como eu não tenho ouvidos, minha experiência é técnica.",
+    "Faço isso da melhor forma que uma IA pode fazer.",
+    "Sinto muito pelo que aconteceu, Gegê.",
+    "Segundo os resultados da busca, o jogo foi ontem.",
+])
+def test_aviso_quando_ela_fala_como_maquina(resposta):
+    avisos = analisar_repeticao([resposta], ["x"], [])
+    assert any("como máquina" in a for a in avisos)
+
+
+@pytest.mark.parametrize("resposta", [
+    "Eita! Vi agora no ge que o Mengão ganhou de virada.",
+    # termos técnicos e honestidade não contam (revisão do Antigravity)
+    "Normaliza a base de dados antes de criar o índice.",
+    "Um modelo de linguagem é treinado pra prever o próximo token.",
+    "Sou uma IA, e você sabe bem, foi você que me montou.",
+    "Relaxa, sem pressão, faz no seu tempo.",
+])
+def test_sem_aviso_de_maquina_em_fala_normal(resposta):
+    avisos = analisar_repeticao([resposta], ["x"], [])
+    assert not any("como máquina" in a for a in avisos)
+
+
+def test_deslize_ja_corrigido_nao_gera_aviso_de_novo():
+    # Revisão do Antigravity: olhar 2 respostas repetia o aviso de um erro já corrigido.
+    respostas = ["Obrigado! Como uma IA, fico feliz.", "Obrigada! Fiquei feliz."]
+    avisos = analisar_repeticao(respostas, ["x"], [])
+    assert not any("masculino" in a or "máquina" in a for a in avisos)
+
+
+@pytest.mark.parametrize("texto,tipo", [
+    ("quem ganhou o último jogo do flamengo?", "noticias"),
+    ("o que rolou de notícia sobre a UnB essa semana?", "noticias"),
+    ("qual a versão mais recente do Ollama hoje?", "geral"),   # revisão do Antigravity
+    ("quanto tá o dólar hoje?", "geral"),
+])
+def test_tipo_de_busca(texto, tipo):
+    assert tipo_de_busca(texto) == tipo
+
+
+@pytest.mark.parametrize("resposta", [
+    "Obrigado! Fiquei feliz com isso.",
+    "Hoje tô meio cansado, confesso.",
+    "Fiquei curioso com essa ideia.",
+    "Estou pronto, manda.",
+])
+def test_aviso_quando_ela_fala_de_si_no_masculino(resposta):
+    avisos = analisar_repeticao([resposta], ["x"], [])
+    assert any("masculino" in a for a in avisos)
+
+
+@pytest.mark.parametrize("resposta", [
+    "Obrigada! Fiquei orgulhosa daquela solução.",
+    "Você tá cansado? Vai dormir.",          # falando dele
+    "Ele tava animado com o jogo.",           # terceira pessoa
+    "Tô bem curiosa pra ver isso rodando.",
+])
+def test_sem_aviso_de_masculino_quando_ok(resposta):
+    avisos = analisar_repeticao([resposta], ["x"], [])
+    assert not any("masculino" in a for a in avisos)
 
 
 def test_sem_aviso_quando_ele_puxou_o_tema():

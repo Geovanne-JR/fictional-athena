@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
+import re
 import socket
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable
 from urllib.parse import urlparse
 
@@ -181,13 +184,31 @@ def _buscar(consulta: str, tipo: str) -> list[dict]:
     ["consulta"],
 )
 def buscar_web(consulta: str, tipo: str = "geral") -> dict:
+    tipo = "noticias" if tipo == "noticias" else "geral"
+    problema_tavily = ""
+    if os.environ.get("TAVILY_API_KEY"):
+        try:
+            itens = _buscar_tavily(consulta, tipo)
+            if itens:
+                _enriquecer(itens)  # só lê as que a Tavily não trouxe o texto
+                return {"aviso": AVISO_WEB, "consulta": consulta, "fonte_busca": "tavily", "resultados": itens}
+        except httpx.HTTPStatusError as exc:
+            # Chave inválida (401/403) ou sem créditos (429/432) não pode passar em
+            # silêncio: a busca segue no DuckDuckGo, mas o motivo fica registrado
+            # (achado da auditoria do Bob).
+            problema_tavily = f"Tavily recusou (HTTP {exc.response.status_code}): chave inválida ou sem créditos"
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            problema_tavily = "Tavily indisponível"  # fora do ar ou resposta malformada
     try:
-        return _buscar_web(consulta, tipo)
+        resultado = _buscar_web(consulta, tipo)
     except RuntimeError:
         enxuta = simplificar_consulta(consulta)
         if not enxuta or enxuta == consulta:
             raise
-        return _buscar_web(enxuta, tipo)  # frase inteira às vezes volta vazia; palavras-chave não
+        resultado = _buscar_web(enxuta, tipo)  # frase inteira às vezes volta vazia; palavras-chave não
+    if problema_tavily:
+        resultado["obs"] = problema_tavily + "; resultado veio do DuckDuckGo"
+    return resultado
 
 
 _PALAVRAS_VAZIAS = set(
@@ -217,7 +238,60 @@ def _buscar_web(consulta: str, tipo: str) -> dict:
         if not itens:
             raise
     _enriquecer(itens)
-    return {"aviso": AVISO_WEB, "consulta": consulta, "resultados": itens}
+    return {"aviso": AVISO_WEB, "consulta": consulta, "fonte_busca": "duckduckgo", "resultados": itens}
+
+
+TAVILY_URL = "https://api.tavily.com/search"
+
+
+def _data_iso(texto: str | None) -> str:
+    """'Thu, 19 Nov 2026 11:00:00 GMT' → '2026-11-19'. Vazio se não der pra ler."""
+    if not texto:
+        return ""
+    try:
+        return parsedate_to_datetime(texto).date().isoformat()
+    except (TypeError, ValueError):
+        return texto[:10] if re.match(r"\d{4}-\d{2}-\d{2}", texto) else ""
+
+
+def _buscar_tavily(consulta: str, tipo: str) -> list[dict]:
+    """Buscador principal. API oficial (estável), notícias com data de publicação
+    e filtro de período, e já devolve o texto das páginas (1 crédito por busca)."""
+    corpo = {
+        "query": consulta,
+        "topic": "news" if tipo == "noticias" else "general",
+        "max_results": MAX_RESULTADOS,
+        "include_raw_content": "text",
+    }
+
+    def chamar(periodo: str | None) -> list[dict]:
+        # Dict novo a cada chamada: mutar `corpo` levaria o filtro de uma
+        # chamada pra outra (achado da auditoria do Bob).
+        pedido = {**corpo, "time_range": periodo} if periodo else corpo
+        resp = httpx.post(TAVILY_URL, json=pedido, timeout=20,
+                          headers={"Authorization": f"Bearer {os.environ['TAVILY_API_KEY']}"})
+        resp.raise_for_status()
+        return resp.json().get("results") or []  # "results": null não pode quebrar a ordenação
+
+    # Notícias: primeiro a última semana. Com "mês", um assunto muito noticiado
+    # (eliminação na Libertadores) abafava o jogo de ontem. Só amplia se vier vazio.
+    brutos = chamar("week") if tipo == "noticias" else chamar(None)
+    if tipo == "noticias" and not brutos:
+        brutos = chamar("month")
+
+    if tipo == "noticias":  # mais nova primeiro, sem data no fim
+        brutos = sorted(brutos, key=lambda r: _data_iso(r.get("published_date")), reverse=True)
+    # Ordena ANTES de escolher quais levam o texto: senão as notícias mais novas
+    # ficavam sem texto e as velhas com (achado da revisão do Antigravity).
+    itens = []
+    for pos, r in enumerate(brutos):
+        item = {"titulo": r.get("title", ""), "url": r.get("url", ""), "trecho": (r.get("content") or "")[:500]}
+        if data := _data_iso(r.get("published_date")):
+            item["data"] = data
+        if pos < LER_AUTOMATICO and r.get("raw_content"):
+            item["conteudo"] = delimitar(r["raw_content"][:LIMITE_CONTEUDO_AUTO])
+        itens.append(item)
+    return itens
 
 
 LER_AUTOMATICO = 2  # quantos dos primeiros resultados já vêm com o texto da página
@@ -228,13 +302,13 @@ def _enriquecer(itens: list[dict]) -> None:
     """Lê as primeiras páginas em paralelo e anexa o texto. Só com título e trecho,
     o modelo tendia a completar o que faltava (inventou um placar a partir de
     manchetes de pré-jogo). Falha ao ler uma página não derruba a busca."""
-    alvo = [i for i in itens[:LER_AUTOMATICO] if i.get("url")]
+    alvo = [i for i in itens[:LER_AUTOMATICO] if i.get("url") and "conteudo" not in i]
     if not alvo:
         return
 
     def ler(item: dict) -> None:
         try:
-            r = ler_pagina(item["url"])
+            r = _ler_texto(item["url"])  # texto cru: a cerca é posta uma vez só, aqui
         except Exception:
             return
         if r.get("texto"):
@@ -261,9 +335,9 @@ def url_permitida(url: str) -> bool:
         if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
                 or ip.is_multicast or ip.is_unspecified or ip in _CGNAT):
             return False
-    return True
     # Limite conhecido: DNS rebinding (o httpx resolve o nome de novo ao conectar).
     # Aceitável pra uso pessoal; documentado em docs/decisoes/002.
+    return True
 
 
 # 100.64.0.0/10 não é "privado" pro Python, mas é a faixa da Tailscale (Etapa 2.5):
@@ -279,6 +353,20 @@ _CGNAT = ipaddress.ip_network("100.64.0.0/10")
     ["url"],
 )
 def ler_pagina(url: str) -> dict:
+    r = _ler_texto(url)
+    if "erro" in r:
+        return r
+    return {
+        "aviso": AVISO_WEB,
+        "url": r["url"],
+        "texto": delimitar(r["texto"][:LIMITE_PAGINA]),
+        "cortado": len(r["texto"]) > LIMITE_PAGINA,
+    }
+
+
+def _ler_texto(url: str) -> dict:
+    """Baixa e extrai o texto da página, SEM cerca: {"url", "texto"} ou {"erro"}.
+    Quem entrega pro modelo (ler_pagina, _enriquecer) cerca uma vez só."""
     import trafilatura
 
     # Redirecionamentos seguidos à mão: cada destino passa pela mesma checagem,
@@ -298,7 +386,8 @@ def ler_pagina(url: str) -> dict:
                     return {"erro": f"não é uma página de texto ({tipo})"}
                 for pedaco in resp.iter_bytes():
                     corpo += pedaco
-                    if len(corpo) > MAX_BYTES_PAGINA:
+                    if len(corpo) >= MAX_BYTES_PAGINA:
+                        corpo = corpo[:MAX_BYTES_PAGINA]  # o último pedaço não passa do limite (auditoria do Bob)
                         break
                 break
         else:
@@ -306,9 +395,4 @@ def ler_pagina(url: str) -> dict:
     texto = trafilatura.extract(corpo, url=url, include_comments=False, include_tables=True) or ""
     if not texto.strip():
         return {"erro": "não consegui extrair texto (página vazia ou montada por JavaScript)"}
-    return {
-        "aviso": AVISO_WEB,
-        "url": url,
-        "texto": delimitar(texto[:LIMITE_PAGINA]),
-        "cortado": len(texto) > LIMITE_PAGINA,
-    }
+    return {"url": url, "texto": texto}

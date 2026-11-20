@@ -25,6 +25,9 @@ temperature = 0.85
 top_p = 0.95
 top_k = 64
 repeat_penalty = 1.05
+# Corta da cauda os tokens muito improváveis (apareceu um caractere birmanês no
+# meio de uma palavra na validação da persona). Não muda o estilo.
+min_p = 0.05
 
 [memoria]
 # Orçamento de tokens do histórico da conversa (memória de curto prazo).
@@ -37,7 +40,9 @@ perfil_usuario = "config/perfil.md"
 nome_usuario = "Gegê"
 # Temas que a v2.0 repetia até cansar. O anti-repetição vigia esses
 # e manda ela largar o assunto se ela puxar sozinha várias vezes.
-temas_vigiados = ["flamengo", "mengão", "nuvem", "aws", "azure", "rtx", "3060", "silício", "vram"]
+# Inclui os gostos dela (persona.md): ter gostos é humano, falar deles toda hora não é.
+temas_vigiados = ["flamengo", "mengão", "nuvem", "aws", "azure", "rtx", "3060", "silício", "vram",
+                  "rock", "indie", "lo-fi", "ficção científica"]
 
 [ferramentas]
 ativas = true
