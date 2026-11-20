@@ -47,6 +47,26 @@ SINAIS = {
 }
 
 
+_DESPEDIDA = re.compile(
+    r"\b(tchau|xau|ate (mais|amanha|logo|depois|a proxima)|falou|flw|fui|vou dormir|vou nessa|"
+    r"vou sair|vou indo|pode descansar|desliga|boa noite)\b"
+)
+
+
+def eh_despedida(texto: str, ja_conversou: bool) -> bool:
+    """Mensagem curta de tchau. 'boa noite' só conta se já houve conversa
+    (no começo da sessão é cumprimento). Pergunta nunca é despedida."""
+    t = _normalizar(texto)
+    if "?" in t or len(t.split()) > 8:
+        return False
+    achados = {m.group(0) for m in _DESPEDIDA.finditer(t)}
+    if not achados:
+        return False
+    if achados == {"boa noite"}:
+        return ja_conversou
+    return True
+
+
 def _normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
     return re.sub(r"\s+", " ", sem_acento.lower()).strip()

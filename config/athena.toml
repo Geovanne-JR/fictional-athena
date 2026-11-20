@@ -12,9 +12,10 @@ host = "http://127.0.0.1:11434"
 # Janela de contexto. 16k cabe com folga na 3060 junto com o modelo.
 # Mudar isso faz o Ollama recarregar o modelo.
 num_ctx = 16384
-# Quanto tempo o modelo fica na VRAM depois da última mensagem.
-# Depois disso ele sai e libera a placa pra jogar.
-keep_alive = "20m"
+# Quanto tempo o modelo fica na VRAM depois da última mensagem, se você
+# deixar o chat aberto parado. Ao sair (/sair, Ctrl+C ou se despedir dela)
+# a VRAM é liberada na hora. Recarregar leva ~5s.
+keep_alive = "5m"
 # Raciocínio estendido ("thinking"): mais inteligente, bem mais lento.
 # Dá pra alternar no chat com /pensar.
 pensar = false

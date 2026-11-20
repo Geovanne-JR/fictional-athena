@@ -1,6 +1,20 @@
 from datetime import datetime, timedelta
 
-from athena.estado import MotorEmocional, detectar_sinais, energia_circadiana
+from athena.estado import MotorEmocional, detectar_sinais, eh_despedida, energia_circadiana
+
+
+def test_despedidas():
+    assert eh_despedida("tchau athena", ja_conversou=False)
+    assert eh_despedida("valeu, até amanhã!", ja_conversou=True)
+    assert eh_despedida("vou dormir, flw", ja_conversou=True)
+    assert eh_despedida("boa noite athena", ja_conversou=True)
+
+
+def test_nao_e_despedida():
+    assert not eh_despedida("boa noite athena", ja_conversou=False)  # cumprimento
+    assert not eh_despedida("como se diz tchau em japonês?", ja_conversou=True)
+    assert not eh_despedida("me explica heap", ja_conversou=True)
+    assert not eh_despedida("falou-se muito sobre isso mas eu ainda quero entender melhor a parte de grafos", True)
 
 NOITE = datetime(2026, 11, 19, 21, 0)
 

@@ -13,7 +13,7 @@ from typing import Iterator
 from . import ferramentas as fer
 from .cerebro import Cerebro, Evento
 from .config import Config
-from .estado import MotorEmocional
+from .estado import MotorEmocional, eh_despedida
 from .memoria import Diario, MemoriaCurta
 from .prompt import analisar_repeticao, bloco_contexto, montar_system
 
@@ -42,6 +42,9 @@ class Athena:
             self.memoria.ultimas_perguntas(4) + [texto],
             self.cfg.temas_vigiados,
         )
+        despedida = eh_despedida(texto, ja_conversou=bool(self.memoria.turnos))
+        if despedida:
+            avisos.append("ele está se despedindo: responda com uma despedida curta e natural.")
         contexto = bloco_contexto(agora, self.motor.descrever(agora, "o " + self.cfg.nome_usuario), avisos)
 
         # No histórico fica a mensagem crua; o [contexto] só vai na mensagem atual.
@@ -93,3 +96,10 @@ class Athena:
             metricas=metricas,
             modelo=self.cerebro.modelo,
         )
+        if despedida:
+            yield Evento("despedida")
+
+    def dormir(self) -> bool:
+        """Salva o estado e libera a VRAM."""
+        self.motor.salvar()
+        return self.cerebro.descarregar()

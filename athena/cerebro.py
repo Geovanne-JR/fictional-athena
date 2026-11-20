@@ -98,6 +98,14 @@ class Cerebro:
         )
         return time.perf_counter() - t
 
+    def descarregar(self) -> bool:
+        """Tira o modelo da VRAM na hora (keep_alive=0). Retorna False se o Ollama não respondeu."""
+        try:
+            self.cliente.generate(model=self.modelo, prompt="", keep_alive=0)
+            return True
+        except Exception:
+            return False
+
     def uso_de_gpu(self) -> float | None:
         """Fração do modelo carregado que está na VRAM (1.0 = tudo na GPU)."""
         for m in self.cliente.ps().models:

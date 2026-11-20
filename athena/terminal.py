@@ -20,8 +20,6 @@ AJUDA = """[bold]Comandos[/]
 def rodar(athena: Athena) -> None:
     sys.stdout.reconfigure(encoding="utf-8")  # acentos no PowerShell/CMD
     console = Console()
-    nome = athena.cfg.nome_usuario
-    mostrar_metricas = True
 
     console.print(Panel.fit(
         f"[bold magenta]ATHENA 3.0[/] · Projeto Olimpo\n[dim]cérebro: {athena.cerebro.modelo}[/]",
@@ -44,6 +42,18 @@ def rodar(athena: Athena) -> None:
         cor_gpu = f"[red]{gpu:.0%} na GPU — parte está na CPU (vai ficar lento). Rode scripts/diagnostico.py[/]"
     console.print(f"[dim]pronta em {segundos:.1f}s ·[/] {cor_gpu}  [dim]· /ajuda pra comandos[/]\n")
 
+    try:
+        _loop(athena, console)
+    finally:
+        with console.status("liberando a VRAM..."):
+            liberou = athena.dormir()
+        console.print("[dim]Athena dormindo. VRAM liberada.[/]" if liberou
+                      else "[yellow]Não consegui falar com o Ollama pra liberar a VRAM.[/]")
+
+
+def _loop(athena: Athena, console: Console) -> None:
+    nome = athena.cfg.nome_usuario
+    mostrar_metricas = True
     while True:
         try:
             texto = console.input(f"[bold cyan]{nome} ›[/] ").strip()
@@ -75,6 +85,7 @@ def rodar(athena: Athena) -> None:
 
         console.print("[bold magenta]Athena ›[/] ", end="")
         pensando = False
+        tchau = False
         try:
             for ev in athena.responder(texto):
                 if ev.tipo == "pensamento":
@@ -86,6 +97,8 @@ def rodar(athena: Athena) -> None:
                     sys.stdout.flush()
                 elif ev.tipo == "ferramenta":
                     console.print(f"[dim]⚙ {ev.dado}...[/] ", end="")
+                elif ev.tipo == "despedida":
+                    tchau = True
                 elif ev.tipo == "aviso":
                     console.print(f"\n[yellow]{ev.dado}[/]")
                 elif ev.tipo == "metricas" and mostrar_metricas:
@@ -100,6 +113,5 @@ def rodar(athena: Athena) -> None:
         except Exception as exc:
             console.print(f"\n[red]erro: {type(exc).__name__}: {exc}[/]", end="")
         console.print("\n")
-
-    athena.motor.salvar()
-    console.print("[dim]Athena desligando. Até mais.[/]")
+        if tchau:
+            break
