@@ -63,6 +63,12 @@ Próximo ajuste fino: conversar bastante, ler `data/conversas/*.jsonl` e calibra
 - Se a qualidade for fraca: Tavily (tem plano grátis, retorna texto já limpo).
 - Regra na persona: fato recente → buscar antes de responder, citar a fonte.
 
+### Etapa 2.5 — No bolso (Android)
+- Servidor FastAPI + WebSocket no PC, repassando os Eventos do núcleo.
+- App Android nativo (Kotlin): chat, apertar pra falar e registro como **assistente padrão**, pra que segurar o botão do fone abra a Athena.
+- Acesso fora de casa via Tailscale (rede privada). Nunca expor a porta direto na internet.
+- Futuro: "Athena lite" rodando no próprio celular (Gemma 4 E2B/E4B) quando o PC estiver desligado.
+
 ### Etapa 3 — Memória de longo prazo
 - Embeddings locais via Ollama (`embeddinggemma` ou `bge-m3`, ambos multilíngues).
 - Vetores em ChromaDB, em 3 coleções (as antigas "salas"): **fatos** sobre o Gegê, **episódios** (resumos do diário) e **documentos** (PDFs da UnB).
