@@ -33,19 +33,37 @@ def compactar_ferramenta(conteudo: str) -> str:
     """Resultado de ferramenta enxuto pro histórico. Uma busca com páginas lidas
     tem ~2 mil tokens; guardar inteiro faria três buscas comerem o orçamento.
     A resposta da Athena já carrega o que importava; aqui fica só a referência."""
-    if len(conteudo) <= LIMITE_FERRAMENTA_NO_HISTORICO:
-        return conteudo
     try:
         dados = json.loads(conteudo)
     except json.JSONDecodeError:
         dados = None
-    if isinstance(dados, dict) and isinstance(dados.get("resultados"), list):
-        refs = [{k: r[k] for k in ("titulo", "url", "data") if r.get(k)} for r in dados["resultados"]]
-        return json.dumps({"consulta": dados.get("consulta"), "fonte_busca": dados.get("fonte_busca"), "resultados": refs,
-                           "obs": "conteúdo das páginas omitido no histórico"}, ensure_ascii=False)
-    if isinstance(dados, dict) and "texto" in dados:
-        return json.dumps({"url": dados.get("url"), "obs": "texto da página omitido no histórico"},
-                          ensure_ascii=False)
+    if isinstance(dados, dict):
+        resultados = dados.get("resultados")
+        if isinstance(resultados, list):
+            referencias = []
+            for resultado in resultados:
+                if not isinstance(resultado, dict):
+                    continue
+                referencia = {campo: resultado[campo] for campo in ("titulo", "url") if resultado.get(campo)}
+                if data := resultado.get("data"):
+                    referencia["publicada_em"] = data
+                referencias.append(referencia)
+            return json.dumps({
+                "consulta": dados.get("consulta"),
+                "fonte_busca": dados.get("fonte_busca"),
+                "resultados": referencias,
+                "obs": "Texto das páginas omitido. publicada_em é a data de publicação da notícia. O fato pode ter outra data.",
+            }, ensure_ascii=False)
+        if "texto" in dados:
+            return json.dumps({"url": dados.get("url"), "obs": "texto da página omitido no histórico"},
+                              ensure_ascii=False)
+        if "erro" in dados:
+            erro = str(dados["erro"])
+            if len(erro) > LIMITE_FERRAMENTA_NO_HISTORICO:
+                erro = erro[:LIMITE_FERRAMENTA_NO_HISTORICO - 1] + "…"
+            return json.dumps({"erro": erro}, ensure_ascii=False)
+    if len(conteudo) <= LIMITE_FERRAMENTA_NO_HISTORICO:
+        return conteudo
     return conteudo[:LIMITE_FERRAMENTA_NO_HISTORICO] + "…(cortado no histórico)"
 
 

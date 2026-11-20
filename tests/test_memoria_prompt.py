@@ -134,7 +134,7 @@ def test_sem_aviso_de_pergunta_se_ela_ja_corrigiu():
     # Revisão do Antigravity: o aviso diria "sua última terminou com pergunta", o que seria falso.
     respostas = ["Isso é heap. Quer exemplo?", "Feito. Mais alguma coisa?", "Pronto."]
     avisos = analisar_repeticao(respostas, ["x"], [])
-    assert not any("termine sem perguntar" in a for a in avisos)
+    assert not any("não pergunte" in a for a in avisos)
 
 
 @pytest.mark.parametrize("resposta", [
@@ -217,5 +217,11 @@ def test_bloco_contexto_tem_dia_e_periodo():
 def test_aviso_de_pergunta_ja_depois_de_uma():
     # Teste pelo celular: 4 de 5 respostas terminaram com pergunta.
     avisos = analisar_repeticao(["Massa. E você, tá bem?"], ["x"], [])
-    assert any("termine sem perguntar" in a for a in avisos)
-    assert not any("termine sem perguntar" in a for a in analisar_repeticao(["Massa."], ["x"], []))
+    assert any("não pergunte" in a for a in avisos)
+    assert not any("não pergunte" in a for a in analisar_repeticao(["Massa."], ["x"], []))
+
+
+def test_aviso_de_pergunta_no_meio_da_resposta():
+    # No celular, avisada, ela trocou o "?" do fim por pergunta no meio (decisão 008).
+    avisos = analisar_repeticao(["Que fofo! E você, dormiu? Eu tô bem por aqui."], ["x"], [])
+    assert any("não pergunte" in a for a in avisos)

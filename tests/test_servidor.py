@@ -27,7 +27,7 @@ class CerebroFalso:
         yield Evento("texto", self.resposta)
         yield Evento("metricas", {"primeira_palavra_s": 0.1, "tokens_por_s": 30})
 
-    def gerar_consulta(self, pergunta, contexto, hoje):
+    def gerar_consulta(self, pergunta, hoje, conversa=None, ancora=None, contexto_local=""):
         return pergunta
 
     def descarregar(self):

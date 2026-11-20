@@ -70,6 +70,8 @@ Também no fechamento da etapa: persona humana ([004](decisoes/004-persona-human
 ### Etapa 2.5a — No bolso, pelo navegador ✅
 Servidor FastAPI + WebSocket (`athena/servidor.py`) repassando os Eventos do núcleo, página web escura para celular (`athena/web/`) e acesso fora de casa via **Tailscale Serve** (HTTPS só na rede privada; nenhuma porta aberta). Token no `.env`, cookie seguro, uma resposta por vez, sessão de 30 min. Também corrige as datas relativas ("ontem"). Detalhes e revisões: [decisoes/007](decisoes/007-athena-no-celular-pelo-navegador.md).
 
+Depois do teste real pelo celular: continuidade ("Quando?" busca de novo, ancorado no assunto), personalidade (sem interrogatório nem tom de conselheira) e privacidade das buscas (o perfil não sai do PC): [decisoes/008](decisoes/008-continuidade-personalidade-e-privacidade.md).
+
 A ordem mudou no debate entre as três IAs: **memória (Etapa 3) vem antes do app nativo**, e o app nativo vai junto com a voz.
 
 ### Etapa 2.5b — App Android nativo (junto com a Etapa 4)

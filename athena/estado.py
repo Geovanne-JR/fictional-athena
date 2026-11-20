@@ -7,7 +7,7 @@ contínuo e reage a eventos:
 - energia      0..1   curva circadiana (calculada, não armazenada)
 - humor       -1..1   sobe com elogio/agradecimento, cai com grosseria
 - paciencia    0..1   cai com grosseria e mensagem repetida
-- curiosidade  0..1   sobe com perguntas e assuntos novos
+- curiosidade  0..1   sobe com sinais de interesse no assunto
 - vinculo      0..1   cresce devagar a cada conversa e NÃO decai (relação)
 
 Tudo (menos vínculo) volta sozinho pra linha de base com o tempo
@@ -43,7 +43,7 @@ SINAIS = {
     "tristeza": _P(r"\b(triste|chatead[oa]|deprimid[oa]|sozinh[oa]|desanimad[oa]|t[oô] mal|me sentindo mal|vontade de chorar)\b"),
     "estresse": _P(r"\b(prova|deadline|prazo|desesper\w*|socorro|ferrou|cansad[oa]|estressad[oa]|ansios[oa]|nao aguento|urgente|reprovar)\b"),
     "animacao": _P(r"(!{2,}|\bk{3,}\b|\b(ha){2,}\b|\bbora\b|\bvamo\b|\buhu+\b|\bpartiu\b|\bvenceu\b|\bganhamos\b)"),
-    "curioso": _P(r"(\?|\bcomo funciona\b|\bpor que\b|\bexplica\b|\bideia\b|\bo que voce acha\b|\bsera que\b)"),
+    "curioso": _P(r"\b(como funciona|por que|explica|ideia|o que voce acha|sera que)\b"),
 }
 
 
@@ -110,6 +110,7 @@ class MotorEmocional:
         self.caminho = caminho
         self.estado = self._carregar()
         self._ultima_msg = ""
+        self._ultima_msg_triste = False
 
     # ── persistência ────────────────────────────────────────────
     def _carregar(self) -> Estado:
@@ -147,6 +148,7 @@ class MotorEmocional:
         self.decair(ts)
         e = self.estado
         s = detectar_sinais(texto)
+        self._ultima_msg_triste = "tristeza" in s
 
         if "elogio" in s:
             e.humor += 0.15
@@ -190,7 +192,7 @@ class MotorEmocional:
     def nivel_de_humor(self, agora: datetime) -> str:
         """'nenhum' | 'discreto' | 'liberado' — quanto de piada cabe agora."""
         e, energia = self.estado, self.energia(agora)
-        if e.clima_usuario in ("triste", "estressado") or energia < 0.3:
+        if e.clima_usuario in ("triste", "estressado"):
             return "nenhum"
         if e.humor > 0.35 and energia > 0.5:
             return "liberado"
@@ -219,17 +221,23 @@ class MotorEmocional:
         if e.paciencia < 0.4:
             partes.append("com a paciência curta")
         if e.curiosidade > 0.7:
-            partes.append("bem curiosa com o assunto")
+            partes.append("interessada na conversa")
 
         linhas = ["Você está " + ", ".join(partes) + "."]
 
         clima = {
             "estressado": f"{nome_usuario} parece estressado ou sob pressão: foco total em ajudar, objetiva.",
-            "triste": f"{nome_usuario} parece pra baixo: reaja como amiga, curto e querendo saber o que houve. "
-                      "Nada de discurso de apoio nem cardápio de ajuda; se ele pedir conselho ou ajuda, aí ajude de verdade.",
             "animado": f"{nome_usuario} está animado: pode acompanhar a energia dele.",
             "rispido_com_voce": f"{nome_usuario} foi ríspido com você: pode mostrar de leve que não curtiu, sem drama, e siga ajudando.",
         }.get(e.clima_usuario)
+        if e.clima_usuario == "triste":
+            if self._ultima_msg_triste:
+                clima = (f"{nome_usuario} parece pra baixo. Acolha como amiga numa frase curta, tipo ‘ah, não…’ ou ‘que droga’. "
+                         "Evite ‘sinto muito’ e ‘tô aqui com/pra você’. Sem oferta de ajuda nem convite a desabafar. "
+                         "Se ele fez um pedido objetivo, responda ao pedido em seguida.")
+            else:
+                clima = (f"{nome_usuario} comentou há pouco que estava pra baixo. "
+                         "Siga o assunto dele com leveza, sem reabrir o tema.")
         if clima:
             linhas.append(clima)
 

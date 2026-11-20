@@ -79,11 +79,12 @@ def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[s
         if aberturas.count(repetida) >= 2:
             avisos.append(f'suas últimas respostas começaram com "{repetida}..."; comece de outro jeito.')
 
-    # Só a última: no teste pelo celular ela terminou 4 de 5 respostas com pergunta,
-    # porque o aviso só vinha depois de duas seguidas. E olhar as anteriores daria
-    # um aviso falso quando ela já corrigiu (revisão do Antigravity).
-    if respostas and respostas[-1].rstrip().endswith("?"):
-        avisos.append("sua última resposta terminou com pergunta; desta vez termine sem perguntar nada.")
+    # Só a última, mas com "?" em QUALQUER ponto: no celular ela fez 4 de 5 respostas
+    # com pergunta e, avisada, trocou o "?" do fim por pergunta no meio da frase.
+    # Olhar respostas anteriores daria aviso falso depois que ela já corrigiu (decisão 008).
+    if respostas and "?" in respostas[-1]:
+        avisos.append("na sua última resposta você perguntou algo; desta vez não pergunte: "
+                      "comente, reaja ou responda, e deixe ele puxar o próximo assunto.")
 
     # Só a última resposta: olhando as duas últimas, um deslize já corrigido
     # continuava gerando aviso no turno seguinte (achado da revisão do Antigravity).
@@ -119,9 +120,23 @@ _PEDE_ATUALIDADE = re.compile(
     r"eleicoes|eleicao (presidencial|municipal|pra|para|de 20)|"
     r"(jogo|noticias?|cotacao|previsao|placar) de (hoje|ontem)|"
     r"essa semana|esta semana|esse mes|este mes|noticias?|novidades?|lancamento|lancou|"
-    r"versao mais recente|versao atual|precos?|quanto (ta|esta|custa)|cotacao|placar|"
-    r"resultado do jogo|quem ganhou|ganhou|perdeu|empatou|classificacao|previsao do tempo|vai chover)\b"
+    r"versao mais recente|versao atual|precos?|quanto (ta|esta|custa)|placar|"
+    # "ganhou"/"perdeu" soltos buscavam notícias em "você ganhou meu carinho" e "perdeu minha
+    # mensagem?" (Codex, decisão 008): só contam com placar, adversário ou data.
+    r"resultado do jogo|quem (ganhou|venceu)|(ganhou|perdeu|empatou|venceu) (de|do|da|pro|pra|para|"
+    r"o jogo|a partida|a final|ontem|hoje|no domingo|no sabado)|classificacao|previsao do tempo|vai chover)\b"
 )
+
+# Cotação só busca com sinal de valor atual ou de conferência. No celular, "o que você acha
+# do dólar hoje?" e "tem certeza que o dólar tá esse valor?" não buscavam e ela inventou os
+# dois valores. "Por que o dólar sobe?" continua explicação, sem busca (decisão 008).
+# "bolsa" sozinha é a bolsa da cadeira (Codex): só "bolsa de valores"/B3.
+_ATIVO = re.compile(r"\b(dolar|euro|libra|iene|bitcoin|btc|ethereum|cripto\w*|ibovespa|bolsa de valores|b3|selic|ouro)\b")
+# Movimento já ocorrido é fato a verificar ("por que o dólar CAIU hoje?"); o presente genérico
+# é explicação ("por que o dólar sobe?", mesmo com "hoje eu queria entender...") (Codex).
+_MOVIMENTO_OCORRIDO = re.compile(r"\b(caiu|subiu|disparou|despencou|fechou|abriu|bateu|derreteu)\b")
+_VALOR_ATUAL = re.compile(r"\b(hoje|agora|ta|esta|quanto|valor|cotacao|certeza|subiu|caiu|fechou|abriu|atual)\b")
+_EXPLICACAO = re.compile(r"\b(por que|porque|pq|entender|explica\w*|como funciona)\b")
 
 
 def pede_atualidade(texto: str) -> bool:
@@ -129,7 +144,66 @@ def pede_atualidade(texto: str) -> bool:
     O modelo sozinho decide mal quando buscar (inventou versão do Ollama e
     "pesquisou" notícias sem chamar a ferramenta). Falso positivo custa só
     uma busca a mais (~3s); falso negativo custa uma resposta inventada."""
-    return bool(_PEDE_ATUALIDADE.search(_norm(texto)))
+    norm = _norm(texto)
+    if _PEDE_ATUALIDADE.search(norm):
+        return True
+    # "Por que o dólar caiu hoje?" é fato recente a verificar; "por que o dólar sobe?" é explicação.
+    explicacao = _EXPLICACAO.search(norm) and not _MOVIMENTO_OCORRIDO.search(norm)
+    if explicacao:
+        return False
+    return bool(re.search(r"\bcotac(ao|oes)\b", norm) or (_ATIVO.search(norm) and _VALOR_ATUAL.search(norm)))
+
+
+# Pergunta curta que só faz sentido com o assunto anterior: "Quando?", "e quem ganhou?",
+# "tem certeza?". No celular, "Quando?" depois da busca das eleições não buscou e ela
+# chutou a data (7 de 7 rodadas na reprodução). Pessoal ("quando você vai dormir?") não conta.
+_SEGUIMENTO = re.compile(
+    r"^(e |mas )?(quando|onde|quem|quanto|qual|quais|que horas|que dia|em que (dia|ano|mes)|"
+    r"tem certeza|e verdade|confirma)\b"
+)
+_PESSOAL = re.compile(r"\b(voce|vc|tu|te|ti|sua|seu|suas|seus|eu|me|mim|meu|minha|meus|minhas|a gente)\b")
+_PEDE_DATA = re.compile(r"\b(quando|que dia|que horas|em que (dia|ano|mes)|data)\b")
+MAX_PALAVRAS_SEGUIMENTO = 8
+
+
+_E_O_DETALHE = re.compile(r"^(e|mas) (o|a|os|as) \w+")  # "E o horário?"
+_VOCE_TEM_CERTEZA = re.compile(r"^(voce|vc) (tem certeza|ta certa|esta certa)\b")
+
+
+def pergunta_de_seguimento(texto: str) -> bool:
+    """Pedido curto de detalhe ou confirmação que depende do assunto anterior.
+    O núcleo só busca de novo se também houve busca nos últimos 2 turnos.
+    Precisa ser pergunta ("?") ou bem curta: "Quando chove, fico em casa." é afirmação (Codex)."""
+    norm = _norm(texto).strip()
+    palavras = len(norm.split())
+    if palavras > MAX_PALAVRAS_SEGUIMENTO or ("?" not in texto and palavras > 2):
+        return False
+    if _VOCE_TEM_CERTEZA.search(norm):
+        return True
+    if _PESSOAL.search(norm):
+        return False
+    return bool(_SEGUIMENTO.search(norm) or (palavras <= 4 and _E_O_DETALHE.search(norm)))
+
+
+def pede_data(texto: str) -> bool:
+    return bool(_PEDE_DATA.search(_norm(texto)))
+
+
+_VOLATIL = re.compile(r"\b(placar|ao vivo|cotacao|agora)\b")
+
+
+def dado_volatil(texto: str) -> bool:
+    """Cotação, placar ao vivo: o valor muda, então a resposta diz de onde e de quando é."""
+    norm = _norm(texto)
+    return bool(_ATIVO.search(norm) or _VOLATIL.search(norm))
+
+
+_PRECISA_LUGAR = re.compile(r"\b(chover|chuva|previsao|clima|temperatura|calor|frio|transito|perto|aqui na cidade)\b")
+
+
+def precisa_de_lugar(texto: str) -> bool:
+    """Só estas buscas levam a cidade do perfil (privacidade, decisão 008)."""
+    return bool(_PRECISA_LUGAR.search(_norm(texto)))
 
 
 # Verbos como "pensa" e "sente" só contam com objeto de natureza/emoção ou no fim
@@ -158,19 +232,41 @@ _PEDE_NOTICIA = re.compile(
 )
 
 
+# Fato já consolidado (eleição, data de evento): busca geral. Notícias só olham a última
+# semana, e "quem ganhou as eleições" trouxe análises de novembro sem a data de outubro;
+# a busca geral achou o TSE (decisões 007 e 008).
+_FATO_CONSOLIDADO = re.compile(r"\b(eleic(ao|oes)|quando (foi|foram)|que dia (foi|foram)|em que (dia|ano|mes))\b")
+
+
+# Sem "hoje" solto: "versão do Ollama hoje" ia pra notícias da semana (revisão do Antigravity, 006).
+_COBERTURA_RECENTE = re.compile(r"\b(noticias?|novidades?|essa semana|esta semana|nesta semana|rolou)\b")
+
+
 def tipo_de_busca(texto: str) -> str:
-    """'noticias' para acontecimentos (jogos, notícias); 'geral' para o resto (versões, preços...)."""
-    return "noticias" if _PEDE_NOTICIA.search(_norm(texto)) else "geral"
+    """'noticias' para cobertura recente (jogos, o que rolou); 'geral' para o resto
+    (versões, preços, datas e resultados de eventos já consolidados).
+    Ordem (Codex): pedido explícito de notícia/hoje → notícias; fato consolidado ou ano
+    passado ("Copa de 2014") → geral; acontecimento esportivo → notícias."""
+    norm = _norm(texto)
+    if _COBERTURA_RECENTE.search(norm):
+        return "noticias"
+    anos = [int(a) for a in re.findall(r"\b((?:19|20)\d{2})\b", norm)]
+    if _FATO_CONSOLIDADO.search(norm) or any(a < datetime.now().year for a in anos):
+        return "geral"
+    return "noticias" if _PEDE_NOTICIA.search(norm) else "geral"
 
 
-def bloco_contexto(agora: datetime, descricao_estado: str, avisos: list[str]) -> str:
-    ontem = agora - timedelta(days=1)  # explícito: depois da meia-noite ela errava o "ontem"
-    linhas = [
-        "[contexto — privado, não mencione]",
-        f"Agora: {DIAS[agora.weekday()]}, {agora:%d/%m/%Y}, {agora:%H:%M} ({periodo_do_dia(agora.hour)}). "
-        f"Ontem foi {DIAS[ontem.weekday()]}, {ontem:%d/%m}.",
-        descricao_estado,
-    ]
+def bloco_contexto(agora: datetime, descricao_estado: str, avisos: list[str], texto: str = "") -> str:
+    agora_txt = f"Agora: {DIAS[agora.weekday()]}, {agora:%d/%m/%Y}, {agora:%H:%M} ({periodo_do_dia(agora.hour)})."
+    # "Ontem foi..." em todo turno puxava "ontem" pra conversa e virou a data chutada da
+    # eleição ("foi ontem, 19/11") na reprodução. Só entra quando ELE usa a palavra (decisão 008).
+    norm = _norm(texto)
+    for palavra, dias in (("anteontem", 2), ("ontem", 1)):
+        if re.search(rf"\b{palavra}\b", norm):
+            dia = agora - timedelta(days=dias)
+            agora_txt += f" {palavra.capitalize()} foi {DIAS[dia.weekday()]}, {dia:%d/%m}."
+            break
+    linhas = ["[contexto — privado, não mencione]", agora_txt, descricao_estado]
     if avisos:
         linhas.append("Avisos: " + " ".join(avisos))
     linhas.append("[/contexto]")

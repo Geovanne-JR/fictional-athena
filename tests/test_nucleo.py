@@ -16,7 +16,7 @@ class CerebroFalso:
         self.chamadas += 1
         yield from self.roteiros.pop(0)
 
-    def gerar_consulta(self, pergunta, contexto, hoje):
+    def gerar_consulta(self, pergunta, hoje, conversa=None, ancora=None, contexto_local=""):
         return pergunta
 
     def descarregar(self):

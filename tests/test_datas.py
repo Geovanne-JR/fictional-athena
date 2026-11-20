@@ -47,15 +47,24 @@ def test_buscar_web_sai_com_data_de_publicacao(monkeypatch):
     assert r["resultados"][0]["publicada"].startswith("hoje")
 
 
-def test_contexto_diz_qual_foi_ontem_depois_da_meia_noite():
+def test_contexto_diz_qual_foi_ontem_quando_ele_fala_ontem():
     # O caso real: 00:30 de sexta, 20/11. "Ontem" é quinta, 19/11.
-    b = bloco_contexto(datetime(2026, 11, 20, 0, 30), "Você está bem.", [])
+    b = bloco_contexto(datetime(2026, 11, 20, 0, 30), "Você está bem.", [], "e o jogo de ontem?")
     assert "sexta-feira, 20/11/2026" in b
     assert "Ontem foi quinta-feira, 19/11." in b
 
 
+def test_contexto_sem_ontem_se_ele_nao_falou():
+    # Decisão 008: a linha fixa puxava "ontem" pra conversa e virou a data chutada
+    # da eleição ("foi ontem, 19/11") em 4 de 7 rodadas da reprodução.
+    b = bloco_contexto(datetime(2026, 11, 20, 4, 5), "ok", [], "Quando?")
+    assert "ontem" not in b.lower()
+    b = bloco_contexto(datetime(2026, 11, 20, 4, 5), "ok", [], "e anteontem, rolou o quê?")
+    assert "Anteontem foi quarta-feira, 18/11." in b
+
+
 def test_contexto_vira_o_mes():
-    b = bloco_contexto(datetime(2026, 12, 1, 9, 0), "ok", [])
+    b = bloco_contexto(datetime(2026, 12, 1, 9, 0), "ok", [], "o que rolou ontem?")
     assert "Ontem foi segunda-feira, 30/11." in b
 
 

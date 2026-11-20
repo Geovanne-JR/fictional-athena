@@ -99,38 +99,50 @@ class Cerebro:
         )
         return time.perf_counter() - t
 
-    def gerar_consulta(self, pergunta: str, contexto_usuario: str, hoje: str,
-                       conversa: list[str] | None = None) -> str:
+    def gerar_consulta(self, pergunta: str, hoje: str, conversa: list[str] | None = None,
+                       ancora: str | None = None, contexto_local: str = "") -> str:
         """Reescreve a pergunta como consulta de busca curta. A pergunta crua dá
         consulta ruim ("o que rolou... UnB" achava a universidade do Canadá).
-        Em caso de erro devolve a pergunta original."""
-        system = (
-            "Você transforma a pergunta do usuário numa consulta curta para um buscador da web, em português do Brasil. "
-            "Expanda siglas e nomes usando o perfil do usuário. Use 'resultado' ou 'placar' só para jogos, "
-            "'notícias' só para acontecimentos, e para software use o nome em inglês com 'latest release'. "
-            "Se a pergunta depende da conversa ('o próximo jogo', 'e ele?'), use o assunto da conversa, "
-            "não o perfil. Não use anos do seu treinamento: se precisar de um ano, use o atual (o de hoje) "
-            "ou um que ele tenha dito. Responda SÓ a consulta, sem aspas, sem explicação. Hoje é " + hoje + ".\n\n"
-            + contexto_usuario
-        )
-        mensagem = pergunta
+
+        Privacidade (decisão 008): a consulta sai do PC, então o perfil NÃO entra.
+        Só a pergunta, a conversa recente, a consulta anterior (âncora: texto escrito
+        por nós, nunca trecho de página) e, quando a pergunta depende de lugar, a
+        cidade. O system é estático; o que muda vai na mensagem.
+        Em caso de erro devolve a pergunta (com a âncora, se for um seguimento)."""
+        partes = [f"Hoje é {hoje}."]
+        if contexto_local:
+            partes.append(f"Lugar de quem pergunta: {contexto_local}.")
         if conversa:
             # Sem isso, "qual a data do próximo jogo?" depois de falar do Barcelona
             # virou busca do Flamengo (time do perfil), no teste pelo celular.
-            # Variável separada: no erro, devolve a pergunta limpa (revisão do Antigravity).
-            mensagem = "Conversa até agora: " + " | ".join(conversa) + "\nPergunta atual: " + pergunta
+            partes.append("Conversa até agora: " + " | ".join(conversa))
+        if ancora:
+            partes.append(f"Consulta anterior sobre este assunto: {ancora}")
+        partes.append("Pergunta atual: " + pergunta)
+        mensagem = "\n".join(partes)
+        reserva = f"{ancora} {pergunta}" if ancora else pergunta  # "Quando?" puro não serve pro buscador
         try:
             r = self.cliente.chat(
                 model=self.modelo,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": mensagem}],
+                messages=[{"role": "system", "content": SYSTEM_CONSULTA}, {"role": "user", "content": mensagem}],
                 options={**self.cfg.opcoes_ollama, "temperature": 0.2, "num_predict": 40},
                 keep_alive=self.cfg.keep_alive,
                 **({"think": False} if self._aceita_think else {}),
             )
             consulta = extrair_consulta(r.message.content or "")
         except Exception:
-            return pergunta
-        return consulta if 2 <= len(consulta) <= 200 else pergunta
+            return reserva
+        if not 2 <= len(consulta) <= 200:
+            return reserva
+        # O modelo punha anos do treinamento ("eleições EUA 2024" em 2026, reteste da decisão
+        # 008) mesmo com a instrução. Ano que ninguém citou e não é o atual sai da consulta.
+        # Só autoriza ano dito por ELE (ou o de hoje), não um ano que a própria Athena falou;
+        # e pega ano colado em pontuação ou data ("2024,", "(2024)", "03/11/2024") (Codex).
+        falas_dele = [c for c in (conversa or []) if c.startswith("ele:")]
+        citados = set(re.findall(r"(?<!\d)(?:19|20)\d{2}(?!\d)", " ".join([hoje, pergunta, ancora or "", *falas_dele])))
+        consulta = " ".join(p for p in consulta.split()
+                            if set(re.findall(r"(?<!\d)(?:19|20)\d{2}(?!\d)", p)) <= citados)
+        return consulta or reserva
 
     def descarregar(self) -> bool:
         """Tira o modelo da VRAM na hora (keep_alive=0). Retorna False se o Ollama não respondeu."""
@@ -151,6 +163,20 @@ class Cerebro:
     def modelo_instalado(self) -> bool:
         nomes = {m.model for m in self.cliente.list().models}
         return self.modelo in nomes or f"{self.modelo}:latest" in nomes
+
+
+SYSTEM_CONSULTA = (
+    "Você transforma a pergunta atual numa consulta curta para um buscador da web, em português do Brasil. "
+    "Quem pergunta mora no Brasil: em assunto que depende de país (eleição, governo, feriado, preço), "
+    "o assunto é o do Brasil, a menos que ele cite outro país. "
+    "Se a pergunta depende da conversa ('Quando?', 'o próximo jogo', 'e ele?'), use o assunto da conversa e a "
+    "consulta anterior. Use 'resultado' ou 'placar' só para jogos, 'notícias' só para acontecimentos, 'data' "
+    "quando ele pergunta quando algo foi ou será, e para software o nome em inglês com 'latest release'. "
+    "Não use anos do seu treinamento: se precisar de um ano, use o de hoje ou um que ele tenha dito. "
+    "Use o lugar de quem pergunta só se a pergunta depender de lugar (tempo, trânsito, 'perto'). "
+    "Nunca coloque na consulta o nome, apelido ou dados pessoais de quem pergunta. "
+    "Responda SÓ a consulta, sem aspas, sem explicação."
+)
 
 
 def extrair_consulta(resposta: str) -> str:

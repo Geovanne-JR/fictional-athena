@@ -42,7 +42,9 @@ nome_usuario = "Gegê"
 # e manda ela largar o assunto se ela puxar sozinha várias vezes.
 # Inclui os gostos dela (persona.md): ter gostos é humano, falar deles toda hora não é.
 temas_vigiados = ["flamengo", "mengão", "nuvem", "aws", "azure", "rtx", "3060", "silício", "vram",
-                  "rock", "indie", "lo-fi", "ficção científica"]
+                  "rock", "indie", "lo-fi", "ficção científica",
+                  # tratamentos carinhosos: bons de vez em quando, chatos como bordão (decisão 008)
+                  "lindão", "bonito"]
 
 [ferramentas]
 ativas = true
