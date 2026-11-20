@@ -54,7 +54,9 @@ class Athena:
         if busca_automatica:
             avisos.append(
                 "já foi feita uma busca na web com a pergunta dele (resultados abaixo). Responda só com o que "
-                "os resultados dizem e compare as datas com a de hoje: 'último' é o mais recente até hoje. "
+                "os resultados dizem. 'publicada' é quando a notícia saiu; a data do fato está no texto, contada "
+                "a partir da publicação. Nunca repita o 'ontem'/'hoje' escrito na notícia. "
+                "'Último' é o mais recente até hoje. "
                 "Resultado sem data pode ser página antiga: se usar um, diga de quando é a informação. "
                 "Se não tiver a resposta, busque de novo com outras palavras ou diga que não encontrou."
             )
@@ -74,7 +76,10 @@ class Athena:
             # a versão do Ollama). Então o código busca antes, como se ela tivesse
             # chamado a ferramenta, e ela segue livre pra buscar de novo.
             # O código decide QUANDO buscar; o modelo escreve O QUE buscar.
-            consulta = self.cerebro.gerar_consulta(texto, self.perfil, f"{agora:%d/%m/%Y}")
+            # O assunto pode ter vindo da resposta dela ("tem Barcelona amanhã" → "que horas?").
+            conversa = [f"ele: {p}" for p in self.memoria.ultimas_perguntas(2)]
+            conversa += [f"você: {r[:200]}" for r in self.memoria.ultimas_respostas(1)]
+            consulta = self.cerebro.gerar_consulta(texto, self.perfil, f"{agora:%d/%m/%Y}", conversa)
             args = {"consulta": consulta, "tipo": tipo_de_busca(texto)}
             yield Evento("ferramenta", {"nome": "buscar_web", "argumentos": args})
             chamada = {"role": "assistant", "content": "",

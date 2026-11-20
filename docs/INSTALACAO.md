@@ -66,6 +66,28 @@ Comandos no chat:
 | `/limpar` | esquece a conversa atual |
 | `/sair` | encerra |
 
+## 6. No celular (navegador, via Tailscale)
+A Athena roda no PC; o celular é só a tela. Funciona fora de casa, no 4G, sem abrir porta no roteador ([decisão 007](decisoes/007-athena-no-celular-pelo-navegador.md)).
+
+1. **Tailscale** no PC (`winget install Tailscale.Tailscale`) e no celular (Play Store), logados na **mesma conta**.
+2. No painel do Tailscale (https://login.tailscale.com/admin/dns): ativar **MagicDNS** e **HTTPS Certificates**. Não ative o **Funnel** (ele abre pra internet).
+3. Criar a senha do servidor (fica no `.env`, fora do git):
+   ```powershell
+   .\.venv\Scripts\python -m athena --gerar-token
+   ```
+4. Subir o servidor e publicar na sua rede (o `serve` é uma vez só; o Tailscale lembra):
+   ```powershell
+   .\.venv\Scripts\python -m athena --servidor
+   & "C:\Program Files\Tailscale	ailscale.exe" serve --bg 8765
+   ```
+5. No celular, abrir o endereço `https://<nome-do-pc>.<sua-tailnet>.ts.net` que o servidor mostra e digitar o `ATHENA_TOKEN`. Pelo menu do Chrome, "Adicionar à tela inicial" vira um ícone de app.
+
+Terminal e servidor não rodam ao mesmo tempo (uma Athena só, um estado emocional só).
+
+**Se o celular não achar o endereço (`ERR_NAME_NOT_RESOLVED`):** no app do Tailscale, ativar "Use Tailscale DNS" e reconectar; no Android, deixar o "DNS privado" desligado ou automático; no Chrome, desligar o "DNS seguro".
+
+**Para o celular achar o PC, o PC não pode entrar em suspensão** (Configurações → Sistema → Energia).
+
 ## Onde ficam as coisas
 | Caminho | Conteúdo |
 |---|---|

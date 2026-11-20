@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0d0f14">
+  <meta name="color-scheme" content="dark">
+  <title>Athena</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/estilo.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main id="entrar" class="entrar" hidden>
+    <img src="/icone.svg" alt="" class="logo">
+    <h1>Athena</h1>
+    <p class="sub">Projeto Olimpo</p>
+    <form id="form-entrar">
+      <input id="token" type="password" autocomplete="current-password" placeholder="senha (ATHENA_TOKEN)" required>
+      <button type="submit">Entrar</button>
+      <p id="erro-entrar" class="erro" role="alert"></p>
+    </form>
+  </main>
+
+  <div id="chat" class="chat" hidden>
+    <header>
+      <span id="ponto" class="ponto" title="conexão"></span>
+      <span class="titulo">Athena</span>
+      <span id="status" class="status" aria-live="polite"></span>
+      <button id="menu" class="icone-btn" aria-label="opções">⋯</button>
+      <div id="opcoes" class="opcoes" hidden>
+        <button id="limpar">Começar conversa nova</button>
+        <button id="sair">Sair deste aparelho</button>
+      </div>
+    </header>
+    <section id="mensagens" class="mensagens" aria-live="polite"></section>
+    <form id="form-msg" class="compor">
+      <textarea id="texto" rows="1" placeholder="Fala com ela…" maxlength="4000" enterkeyhint="send"></textarea>
+      <button id="enviar" type="submit" aria-label="enviar">➤</button>
+    </form>
+  </div>
+</body>
+</html>

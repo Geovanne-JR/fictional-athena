@@ -46,7 +46,8 @@ def test_tavily_normaliza_data_e_ordena_noticias(com_chave, monkeypatch):
     assert r["fonte_busca"] == "tavily"
     assert enviado["topic"] == "news" and enviado["time_range"] == "week"
     datas = [i.get("data") for i in r["resultados"]]
-    assert datas == ["2026-11-19", "2026-11-18", None]  # mais nova primeiro, sem data no fim
+    # 01:42 GMT de 18/11 = 22:42 de 17/11 em Brasília
+    assert datas == ["2026-11-19", "2026-11-17", None]  # mais nova primeiro, sem data no fim
     assert r["resultados"][0]["conteudo"].startswith("<<<TEXTO DA WEB")
 
 

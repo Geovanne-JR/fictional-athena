@@ -99,7 +99,8 @@ class Cerebro:
         )
         return time.perf_counter() - t
 
-    def gerar_consulta(self, pergunta: str, contexto_usuario: str, hoje: str) -> str:
+    def gerar_consulta(self, pergunta: str, contexto_usuario: str, hoje: str,
+                       conversa: list[str] | None = None) -> str:
         """Reescreve a pergunta como consulta de busca curta. A pergunta crua dá
         consulta ruim ("o que rolou... UnB" achava a universidade do Canadá).
         Em caso de erro devolve a pergunta original."""
@@ -107,12 +108,21 @@ class Cerebro:
             "Você transforma a pergunta do usuário numa consulta curta para um buscador da web, em português do Brasil. "
             "Expanda siglas e nomes usando o perfil do usuário. Use 'resultado' ou 'placar' só para jogos, "
             "'notícias' só para acontecimentos, e para software use o nome em inglês com 'latest release'. "
-            "Responda SÓ a consulta, sem aspas, sem explicação. Hoje é " + hoje + ".\n\n" + contexto_usuario
+            "Se a pergunta depende da conversa ('o próximo jogo', 'e ele?'), use o assunto da conversa, "
+            "não o perfil. Não use anos do seu treinamento: se precisar de um ano, use o atual (o de hoje) "
+            "ou um que ele tenha dito. Responda SÓ a consulta, sem aspas, sem explicação. Hoje é " + hoje + ".\n\n"
+            + contexto_usuario
         )
+        mensagem = pergunta
+        if conversa:
+            # Sem isso, "qual a data do próximo jogo?" depois de falar do Barcelona
+            # virou busca do Flamengo (time do perfil), no teste pelo celular.
+            # Variável separada: no erro, devolve a pergunta limpa (revisão do Antigravity).
+            mensagem = "Conversa até agora: " + " | ".join(conversa) + "\nPergunta atual: " + pergunta
         try:
             r = self.cliente.chat(
                 model=self.modelo,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": pergunta}],
+                messages=[{"role": "system", "content": system}, {"role": "user", "content": mensagem}],
                 options={**self.cfg.opcoes_ollama, "temperature": 0.2, "num_predict": 40},
                 keep_alive=self.cfg.keep_alive,
                 **({"think": False} if self._aceita_think else {}),

@@ -24,6 +24,8 @@ class Config:
     nome_usuario: str
     temas_vigiados: list[str] = field(default_factory=list)
     ferramentas_ativas: bool = True
+    porta_servidor: int = 8765
+    sessao_minutos: int = 30
 
     @property
     def opcoes_ollama(self) -> dict:
@@ -34,7 +36,7 @@ class Config:
 
 # Só o que a Athena usa. O .env também guarda chaves de outras ferramentas
 # (ex.: BOB_API_KEY, do auditor), e a Athena não precisa recebê-las.
-CHAVES_DA_ATHENA = frozenset({"TAVILY_API_KEY"})
+CHAVES_DA_ATHENA = frozenset({"TAVILY_API_KEY", "ATHENA_TOKEN"})
 
 
 def carregar_env(caminho: Path, permitidas: frozenset[str] = CHAVES_DA_ATHENA) -> None:
@@ -85,4 +87,6 @@ def carregar(caminho: Path | None = None) -> Config:
         nome_usuario=d["persona"].get("nome_usuario", "você"),
         temas_vigiados=[t.lower() for t in d["persona"].get("temas_vigiados", [])],
         ferramentas_ativas=bool(d.get("ferramentas", {}).get("ativas", True)),
+        porta_servidor=int(d.get("servidor", {}).get("porta", 8765)),
+        sessao_minutos=int(d.get("servidor", {}).get("sessao_minutos", 30)),
     )

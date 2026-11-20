@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .config import Config
 
@@ -79,9 +79,11 @@ def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[s
         if aberturas.count(repetida) >= 2:
             avisos.append(f'suas últimas respostas começaram com "{repetida}..."; comece de outro jeito.')
 
-    finais_com_pergunta = sum(1 for r in respostas[-3:] if r.rstrip().endswith("?"))
-    if finais_com_pergunta >= 2:
-        avisos.append("você tem terminado as respostas com pergunta; desta vez termine sem perguntar nada.")
+    # Só a última: no teste pelo celular ela terminou 4 de 5 respostas com pergunta,
+    # porque o aviso só vinha depois de duas seguidas. E olhar as anteriores daria
+    # um aviso falso quando ela já corrigiu (revisão do Antigravity).
+    if respostas and respostas[-1].rstrip().endswith("?"):
+        avisos.append("sua última resposta terminou com pergunta; desta vez termine sem perguntar nada.")
 
     # Só a última resposta: olhando as duas últimas, um deslize já corrigido
     # continuava gerando aviso no turno seguinte (achado da revisão do Antigravity).
@@ -105,6 +107,16 @@ def analisar_repeticao(respostas: list[str], perguntas: list[str], temas: list[s
 # busca em "como você está hoje?" e "resultado de 2+2" (achado da revisão do Antigravity).
 _PEDE_ATUALIDADE = re.compile(
     r"\b(ultim[oa]s? (jogo|partida|noticia|versao|lancamento|resultado|episodio|temporada)|"
+    # "próximo jogo" não buscava e ela fingiu que pesquisou ("deixa eu ver aqui...") no teste do servidor
+    r"proxim[oa]s? (jogo|partida|episodio|temporada|lancamento|show|evento|rodada)|quando\b[^?.!]{0,30}\b(joga|estreia)|"
+    # Teste pelo celular: "quando foi as eleições?" e "vai ter jogo do Barcelona?" não
+    # buscavam, e ela inventou a data e fingiu que pesquisou.
+    # Ancorados em evento: "quando acontece um deadlock?" e "jogo da velha" não buscam (Antigravity).
+    r"quando (foi|foram|vai ser|vao ser|sera|serao|e|eh|rola) (o|a|os|as) "
+    r"(jogo|jogos|partida|final|show|eleicao|eleicoes|prova|estreia|copa|rodada)|"
+    r"(vai ter|tem) jogo (do|da|hoje|amanha|essa|esse|no|na)|"
+    r"jogo d[oa] (?!velha|vida|forca|memoria|ano)[a-z]+|"
+    r"eleicoes|eleicao (presidencial|municipal|pra|para|de 20)|"
     r"(jogo|noticias?|cotacao|previsao|placar) de (hoje|ontem)|"
     r"essa semana|esta semana|esse mes|este mes|noticias?|novidades?|lancamento|lancou|"
     r"versao mais recente|versao atual|precos?|quanto (ta|esta|custa)|cotacao|placar|"
@@ -152,9 +164,11 @@ def tipo_de_busca(texto: str) -> str:
 
 
 def bloco_contexto(agora: datetime, descricao_estado: str, avisos: list[str]) -> str:
+    ontem = agora - timedelta(days=1)  # explícito: depois da meia-noite ela errava o "ontem"
     linhas = [
         "[contexto — privado, não mencione]",
-        f"Agora: {DIAS[agora.weekday()]}, {agora:%d/%m/%Y}, {agora:%H:%M} ({periodo_do_dia(agora.hour)}).",
+        f"Agora: {DIAS[agora.weekday()]}, {agora:%d/%m/%Y}, {agora:%H:%M} ({periodo_do_dia(agora.hour)}). "
+        f"Ontem foi {DIAS[ontem.weekday()]}, {ontem:%d/%m}.",
         descricao_estado,
     ]
     if avisos:

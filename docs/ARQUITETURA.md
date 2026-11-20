@@ -67,10 +67,13 @@ Feito: `buscar_web` (ddgs, notícias datadas + busca geral, lê as 2 primeiras p
 Buscador principal: **Tavily** (1.000 buscas/mês grátis), com o DuckDuckGo de reserva. O modelo escreve a consulta e o código decide quando buscar: [decisoes/003](decisoes/003-tavily-como-buscador-principal.md).
 Também no fechamento da etapa: persona humana ([004](decisoes/004-persona-humana.md)), correção das quedas do llama-server ([005](decisoes/005-limite-do-cache-de-prompts.md)) e persona feminina + auditoria tripla ([006](decisoes/006-auditoria-fim-da-etapa-2.md)).
 
-### Etapa 2.5 — No bolso (Android)
-- Servidor FastAPI + WebSocket no PC, repassando os Eventos do núcleo.
-- App Android nativo (Kotlin): chat, apertar pra falar e registro como **assistente padrão**, pra que segurar o botão do fone abra a Athena.
-- Acesso fora de casa via Tailscale (rede privada). Nunca expor a porta direto na internet.
+### Etapa 2.5a — No bolso, pelo navegador ✅
+Servidor FastAPI + WebSocket (`athena/servidor.py`) repassando os Eventos do núcleo, página web escura para celular (`athena/web/`) e acesso fora de casa via **Tailscale Serve** (HTTPS só na rede privada; nenhuma porta aberta). Token no `.env`, cookie seguro, uma resposta por vez, sessão de 30 min. Também corrige as datas relativas ("ontem"). Detalhes e revisões: [decisoes/007](decisoes/007-athena-no-celular-pelo-navegador.md).
+
+A ordem mudou no debate entre as três IAs: **memória (Etapa 3) vem antes do app nativo**, e o app nativo vai junto com a voz.
+
+### Etapa 2.5b — App Android nativo (junto com a Etapa 4)
+- App Kotlin consumindo a mesma API (`Authorization: Bearer`): apertar pra falar, rodar em segundo plano e registro como **assistente padrão**, pra que segurar o botão do fone abra a Athena.
 - Futuro: "Athena lite" rodando no próprio celular (Gemma 4 E2B/E4B) quando o PC estiver desligado.
 
 ### Etapa 3 — Memória de longo prazo

@@ -33,6 +33,17 @@ def test_pergunta_sobre_ela(texto, esperado):
     "o que rolou de notícia sobre a UnB essa semana?",
     "quanto tá o dólar?",
     "vai chover hoje em Brasília?",
+    "e quando é o próximo jogo?",
+    "quando estreia a nova temporada?",
+    "quando o Flamengo joga?",                  # revisão do Antigravity
+    "quando a nova temporada estreia?",
+    # teste pelo celular
+    "Quando foi as eleições?",
+    "Vai ter jogo do Barcelona?",
+    "e o jogo do flamengo?",
+    "quando foram as eleições?",
+    "quando é o jogo?",
+    "tem jogo do Barça hoje?",
 ])
 def test_pede_atualidade(texto):
     assert pede_atualidade(texto)
@@ -47,6 +58,14 @@ def test_pede_atualidade(texto):
     "qual o resultado de 2+2?",
     "cria uma tabela com meus horários",
     "minha placa antiga era uma RTX 2060",
+    "qual o próximo passo do projeto?",
+    "quando é melhor usar lista em vez de tupla?",
+    "joguei muito ontem",
+    # falsos positivos apontados pelo Antigravity
+    "quando acontece um deadlock em Python?",
+    "bora jogar jogo da velha",
+    "tem jogo bom no Steam?",
+    "como funciona a eleição de líder no Raft?",
 ])
 def test_nao_pede_atualidade(texto):
     assert not pede_atualidade(texto)
@@ -111,10 +130,11 @@ def test_aviso_quando_ela_puxa_tema_sozinha():
     assert not any("flamengo" in a for a in avisos)
 
 
-def test_aviso_quando_ela_termina_tudo_com_pergunta():
+def test_sem_aviso_de_pergunta_se_ela_ja_corrigiu():
+    # Revisão do Antigravity: o aviso diria "sua última terminou com pergunta", o que seria falso.
     respostas = ["Isso é heap. Quer exemplo?", "Feito. Mais alguma coisa?", "Pronto."]
     avisos = analisar_repeticao(respostas, ["x"], [])
-    assert any("termine sem perguntar" in a for a in avisos)
+    assert not any("termine sem perguntar" in a for a in avisos)
 
 
 @pytest.mark.parametrize("resposta", [
@@ -153,6 +173,9 @@ def test_deslize_ja_corrigido_nao_gera_aviso_de_novo():
     ("o que rolou de notícia sobre a UnB essa semana?", "noticias"),
     ("qual a versão mais recente do Ollama hoje?", "geral"),   # revisão do Antigravity
     ("quanto tá o dólar hoje?", "geral"),
+    # O Antigravity sugeriu "noticias"; ao vivo, o filtro da última semana não achou a
+    # data de uma eleição de outubro. Busca geral acha a página do calendário.
+    ("quando foi as eleições?", "geral"),
 ])
 def test_tipo_de_busca(texto, tipo):
     assert tipo_de_busca(texto) == tipo
@@ -189,3 +212,10 @@ def test_sem_aviso_quando_ele_puxou_o_tema():
 def test_bloco_contexto_tem_dia_e_periodo():
     b = bloco_contexto(datetime(2026, 11, 19, 21, 40), "Você está bem.", [])
     assert "quinta-feira" in b and "21:40" in b and "(noite)" in b
+
+
+def test_aviso_de_pergunta_ja_depois_de_uma():
+    # Teste pelo celular: 4 de 5 respostas terminaram com pergunta.
+    avisos = analisar_repeticao(["Massa. E você, tá bem?"], ["x"], [])
+    assert any("termine sem perguntar" in a for a in avisos)
+    assert not any("termine sem perguntar" in a for a in analisar_repeticao(["Massa."], ["x"], []))

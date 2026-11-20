@@ -59,3 +59,19 @@ def test_gerar_consulta_cai_pra_pergunta_se_der_erro():
 def test_gerar_consulta_ignora_resposta_vazia_ou_gigante():
     assert _cerebro(_ClienteFalso("")).gerar_consulta("x?", "p", "hoje") == "x?"
     assert _cerebro(_ClienteFalso("a" * 500)).gerar_consulta("x?", "p", "hoje") == "x?"
+
+
+def test_gerar_consulta_ve_a_conversa():
+    # Teste pelo celular: "próximo jogo" depois de "Barcelona" virou busca do Flamengo.
+    cli = _ClienteFalso("próximo jogo Barcelona")
+    _cerebro(cli).gerar_consulta("qual a data do próximo jogo?", "perfil: torce pro Flamengo", "20/11/2026",
+                                 ["Vai ter jogo do Barcelona?"])
+    enviado = cli.chamadas[0]["messages"][1]["content"]
+    assert "Barcelona" in enviado and "próximo jogo" in enviado
+    assert "use o assunto da conversa" in cli.chamadas[0]["messages"][0]["content"]
+
+
+def test_gerar_consulta_com_erro_devolve_a_pergunta_limpa():
+    # Revisão do Antigravity: o fallback mandava o texto com a conversa pro buscador.
+    c = _cerebro(_ClienteFalso(erro=ConnectionError("caiu")))
+    assert c.gerar_consulta("quando é o jogo?", "p", "hoje", ["ele: e o Barcelona?"]) == "quando é o jogo?"

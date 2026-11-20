@@ -21,6 +21,7 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -145,7 +146,7 @@ def normalizar_resultados(brutos: list[dict], tipo: str) -> list[dict]:
             "trecho": r.get("body", ""),
         }
         if tipo == "noticias":
-            item["data"] = (r.get("date") or "")[:10]
+            item["data"] = _data_iso(r.get("date"))  # no fuso do PC, como na Tavily (Antigravity)
             item["fonte"] = r.get("source", "")
         itens.append(item)
     if tipo == "noticias":
@@ -168,6 +169,55 @@ def _buscar(consulta: str, tipo: str) -> list[dict]:
     raise RuntimeError(f"busca sem resultado: {erro}")
 
 
+NOTA_DATAS = ("'publicada' é quando a NOTÍCIA saiu (já em relação a hoje), não necessariamente quando o fato "
+              "aconteceu: um jogo de quarta à noite sai na quinta. Para a data do fato, procure no texto "
+              "('nesta quarta-feira (18)' = quarta, dia 18) e conte a partir da publicação. Nunca repita "
+              "'ontem' ou 'hoje' escritos na notícia")
+
+
+def quando(data_iso: str, hoje: date) -> str:
+    """'2026-11-18' visto em 20/11 → 'anteontem (quarta-feira, 18/11)'. O modelo
+    copiava o 'ontem' escrito na notícia em vez de fazer a conta (decisão 007)."""
+    try:
+        dia = date.fromisoformat(data_iso[:10])
+    except ValueError:
+        return ""
+    dias = (hoje - dia).days
+    if dias < 0:
+        rotulo = "data futura"
+    elif dias <= 2:
+        rotulo = ("hoje", "ontem", "anteontem")[dias]
+    elif dias < 7:
+        rotulo = f"há {dias} dias"
+    elif dias < 14:
+        rotulo = "semana passada"
+    elif dias < 60:
+        rotulo = f"há {dias // 7} semanas"
+    elif dias < 365:
+        rotulo = f"há {dias // 30} meses"
+    else:
+        anos = dias // 365
+        rotulo = "há 1 ano" if anos == 1 else f"há {anos} anos"
+    # Com o ano quando não é o atual: "20/11" sozinho parecia hoje (revisão do Antigravity).
+    dia_fmt = f"{dia:%d/%m}" if dia.year == hoje.year else f"{dia:%d/%m/%Y}"
+    return f"{rotulo} ({_DIAS[dia.weekday()]}, {dia_fmt})"
+
+
+_DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+
+
+def marcar_quando(resultado: dict, hoje: date | None = None) -> dict:
+    hoje = hoje or date.today()
+    datados = False
+    for item in resultado.get("resultados", []):
+        if item.get("data") and (q := quando(item["data"], hoje)):
+            item["publicada"] = q
+            datados = True
+    if datados:
+        resultado["nota_datas"] = NOTA_DATAS
+    return resultado
+
+
 @ferramenta(
     "buscar_web",
     "Pesquisa na internet. Use para qualquer fato recente ou que você não tenha certeza: notícias, "
@@ -184,6 +234,10 @@ def _buscar(consulta: str, tipo: str) -> list[dict]:
     ["consulta"],
 )
 def buscar_web(consulta: str, tipo: str = "geral") -> dict:
+    return marcar_quando(_buscar_com_reserva(consulta, tipo))
+
+
+def _buscar_com_reserva(consulta: str, tipo: str) -> dict:
     tipo = "noticias" if tipo == "noticias" else "geral"
     problema_tavily = ""
     if os.environ.get("TAVILY_API_KEY"):
@@ -244,14 +298,27 @@ def _buscar_web(consulta: str, tipo: str) -> dict:
 TAVILY_URL = "https://api.tavily.com/search"
 
 
+FUSO = None  # None = fuso do PC (Brasília). Os testes fixam um fuso.
+
+
 def _data_iso(texto: str | None) -> str:
-    """'Thu, 19 Nov 2026 11:00:00 GMT' → '2026-11-19'. Vazio se não der pra ler."""
+    """'Thu, 19 Nov 2026 11:00:00 GMT' → '2026-11-19', no fuso do PC. Em GMT, uma
+    notícia das 22h27 de Brasília caía no dia seguinte (visto ao vivo, decisão 007).
+    Vazio se não der pra ler."""
     if not texto:
         return ""
     try:
-        return parsedate_to_datetime(texto).date().isoformat()
+        momento = parsedate_to_datetime(texto)  # RFC 2822 (Tavily)
     except (TypeError, ValueError):
-        return texto[:10] if re.match(r"\d{4}-\d{2}-\d{2}", texto) else ""
+        try:
+            momento = datetime.fromisoformat(texto.replace("Z", "+00:00"))  # ISO 8601 (DuckDuckGo)
+        except ValueError:
+            momento = None
+    if momento is not None:
+        if momento.tzinfo is not None:
+            momento = momento.astimezone(FUSO)
+        return momento.date().isoformat()
+    return texto[:10] if re.match(r"\d{4}-\d{2}-\d{2}", texto) else ""
 
 
 def _buscar_tavily(consulta: str, tipo: str) -> list[dict]:

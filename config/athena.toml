@@ -46,3 +46,13 @@ temas_vigiados = ["flamengo", "mengão", "nuvem", "aws", "azure", "rtx", "3060",
 
 [ferramentas]
 ativas = true
+
+[servidor]
+# `python -m athena --servidor`: a Athena pelo navegador do celular (Etapa 2.5a).
+# Escuta SÓ em 127.0.0.1; quem publica na sua rede privada é o Tailscale Serve
+# (decisão 007). O endereço não é configurável de propósito.
+porta = 8765
+# Depois de tanto tempo sem mensagem, a conversa atual é esquecida (uma nova
+# sessão começa). O estado emocional continua. A VRAM é liberada antes, pelo
+# keep_alive do [modelo].
+sessao_minutos = 30
